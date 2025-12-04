@@ -7,7 +7,6 @@
 #include "esp_heap_caps.h"
 #include "cJSON.h"
 #include "mbedtls/base64.h"
-#include "streaming_base64.h"
 #include <string.h>
 #include <stdlib.h>
 #include <inttypes.h>
@@ -24,17 +23,6 @@ typedef struct {
     size_t len;
     size_t cap;
 } http_buffer_t;
-
-// Streaming TTS response context - processes JSON as it arrives
-typedef struct {
-    streaming_base64_decoder_t *decoder;
-    gemini_tts_playback_callback_t callback;
-    void *user_data;
-    bool in_audio_content;
-    bool in_quoted_string;
-    bool escape_next;
-    uint8_t decode_buf[1024];
-} streaming_tts_response_t;
 
 static esp_err_t http_event_handler(esp_http_client_event_t *evt)
 {
@@ -73,129 +61,6 @@ static esp_err_t http_event_handler(esp_http_client_event_t *evt)
         case HTTP_EVENT_DISCONNECTED:
             ESP_LOGI(TAG, "HTTP_EVENT_DISCONNECTED");
             break;
-        default:
-            break;
-    }
-    return ESP_OK;
-}
-
-// Streaming HTTP event handler for TTS - processes JSON and streams audio as it arrives
-static esp_err_t http_event_handler_streaming_tts(esp_http_client_event_t *evt)
-{
-    streaming_tts_response_t *ctx = (streaming_tts_response_t *)evt->user_data;
-
-    switch (evt->event_id) {
-        case HTTP_EVENT_ON_DATA:
-            if (evt->data_len == 0) {
-                break;
-            }
-
-            // Search for "audioContent":"BASE64DATA" pattern in the data
-            const char *data = (const char *)evt->data;
-            size_t data_len = evt->data_len;
-
-            // Debug: log if this is the first chunk and whether we found audioContent
-            static bool found_marker = false;
-            if (!found_marker && strstr(data, "audioContent") != NULL) {
-                ESP_LOGI(TAG, "🎵 Found audioContent marker in HTTP chunk (size=%zu)", data_len);
-                found_marker = true;
-            }
-
-            // Look for "audioContent":"BASE64DATA" pattern
-            static size_t total_base64_chars = 0;
-            static size_t base64_start_offset = 0;
-
-            for (size_t i = 0; i < data_len; i++) {
-                // If we haven't found audioContent yet, search for it
-                if (!ctx->in_audio_content) {
-                    // Look for the literal pattern: "audioContent":"
-                    if (i + 16 <= data_len && strncmp(&data[i], "\"audioContent\":\"", 16) == 0) {
-                        ESP_LOGI(TAG, "🎵 Found audioContent marker at offset %zu", i);
-                        ctx->in_audio_content = true;
-                        base64_start_offset = i + 16;
-                        total_base64_chars = 0;
-                        i += 16;  // Jump past marker to first base64 char
-                        // Don't continue here - process the character at i+16
-                        // Fall through to next iteration which will process first base64 char
-                    } else {
-                        continue;  // No marker found, keep searching
-                    }
-                }
-
-                // If we're in audioContent, process base64 characters
-                if (ctx->in_audio_content) {
-                    char c = data[i];
-
-                    // Check for closing quote (end of base64 string)
-                    if (c == '"') {
-                        // End of base64 string
-                        ctx->in_audio_content = false;
-                        ESP_LOGI(TAG, "🎵 End of base64 marker found. Total base64 chars processed: %zu", total_base64_chars);
-
-                        // Finalize any remaining bytes
-                        size_t final_size = sizeof(ctx->decode_buf);
-                        esp_err_t final_ret = streaming_base64_decode_finish(ctx->decoder, ctx->decode_buf, &final_size);
-                        ESP_LOGI(TAG, "🎵 Base64 finalize: ret=%d, final_size=%zu", final_ret, final_size);
-
-                        if (final_size > 0) {
-                            size_t final_samples = final_size / sizeof(int16_t);
-                            ESP_LOGI(TAG, "🎵 Final audio chunk: %zu samples (callback=%p, user_data=%p)", final_samples, ctx->callback, ctx->user_data);
-                            esp_err_t cb_ret = ctx->callback((int16_t *)ctx->decode_buf, final_samples, ctx->user_data);
-                            ESP_LOGI(TAG, "🎵 Final callback returned: %s", esp_err_to_name(cb_ret));
-                        }
-                        ESP_LOGI(TAG, "🎵 Audio content finished");
-                        break;  // Done processing
-                    }
-                    else if (isalnum(c) || c == '+' || c == '/' || c == '=') {
-                        total_base64_chars++;
-                        // Valid base64 character - decode immediately
-                        uint8_t b64_char = (uint8_t)c;
-                        size_t decode_buf_size = sizeof(ctx->decode_buf);
-                        esp_err_t decode_ret = streaming_base64_decode(
-                            ctx->decoder,
-                            &b64_char, 1,
-                            ctx->decode_buf,
-                            &decode_buf_size);
-
-                        if (decode_ret != ESP_OK) {
-                            ESP_LOGW(TAG, "🎵 Base64 decode error: %s", esp_err_to_name(decode_ret));
-                        }
-
-                        if (decode_buf_size > 0) {
-                            size_t sample_count = decode_buf_size / sizeof(int16_t);
-                            // Log first chunk and every 1 second thereafter
-                            static size_t total_audio_samples = 0;
-                            static bool first_chunk_logged = false;
-                            total_audio_samples += sample_count;
-
-                            if (!first_chunk_logged) {
-                                ESP_LOGI(TAG, "🎵 First audio chunk: %zu samples (first 4 PCM: %d,%d,%d,%d)",
-                                    sample_count,
-                                    ((int16_t*)ctx->decode_buf)[0],
-                                    ((int16_t*)ctx->decode_buf)[1],
-                                    ((int16_t*)ctx->decode_buf)[2],
-                                    ((int16_t*)ctx->decode_buf)[3]);
-                                first_chunk_logged = true;
-                            }
-
-                            if (total_audio_samples % 24000 < sample_count) {  // Log every ~1 second of audio at 24kHz
-                                ESP_LOGD(TAG, "🎵 Streaming %zu samples, total so far: %zu", sample_count, total_audio_samples);
-                            }
-
-                            esp_err_t cb_ret = ctx->callback((int16_t *)ctx->decode_buf, sample_count, ctx->user_data);
-                            if (cb_ret != ESP_OK) {
-                                ESP_LOGW(TAG, "🎵 Callback returned error: %s", esp_err_to_name(cb_ret));
-                            }
-                        }
-                    }
-                }
-            }
-            break;
-
-        case HTTP_EVENT_ON_FINISH:
-            ESP_LOGD(TAG, "HTTP_EVENT_ON_FINISH (streaming TTS)");
-            break;
-
         default:
             break;
     }
@@ -279,8 +144,18 @@ static esp_err_t http_post_json_with_auth(const char *url, const char *json_data
     }
 
     if (!response->data) {
-        // Allocate fixed-size buffer from heap
-        response->data = malloc(RESPONSE_BUFFER_SIZE);
+        // Allocate fixed-size buffer from heap, prefer PSRAM for large buffers
+        // Try PSRAM first for large buffers (>64KB), fall back to internal RAM
+        if (RESPONSE_BUFFER_SIZE > 64 * 1024) {
+            response->data = heap_caps_malloc(RESPONSE_BUFFER_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+            if (!response->data) {
+                ESP_LOGW(TAG, "PSRAM allocation failed, trying internal RAM");
+                response->data = heap_caps_malloc(RESPONSE_BUFFER_SIZE, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+            }
+        } else {
+            response->data = malloc(RESPONSE_BUFFER_SIZE);
+        }
+        
         if (!response->data) {
             // If allocation fails, try smaller buffer (32KB)
             const size_t FALLBACK_SIZE = 32 * 1024;
@@ -710,20 +585,6 @@ esp_err_t gemini_tts(const char *text, int16_t *audio_out, size_t audio_len, siz
     return ESP_FAIL;
 }
 
-/**
- * Context structure for streaming TTS with callback
- */
-typedef struct {
-    streaming_base64_decoder_t decoder;
-    gemini_tts_playback_callback_t callback;
-    void *user_data;
-    const char *base64_audio;  // Pointer to base64 string in response JSON
-    size_t base64_pos;         // Current position in base64_audio
-    size_t base64_len;         // Total length of base64_audio
-    uint8_t decode_buf[1024];  // Buffer for decoded PCM chunks
-    bool in_audio_content;     // Are we inside audioContent field?
-} streaming_tts_context_t;
-
 esp_err_t gemini_tts_streaming(const char *text, gemini_tts_playback_callback_t callback, void *user_data)
 {
     if (!s_initialized) {
@@ -734,7 +595,7 @@ esp_err_t gemini_tts_streaming(const char *text, gemini_tts_playback_callback_t 
         return ESP_ERR_INVALID_ARG;
     }
 
-    ESP_LOGI(TAG, "🔊 [Gemini TTS Streaming] Generating speech: \"%.100s%s\"",
+    ESP_LOGI(TAG, "🔊 [Gemini TTS] Generating speech: \"%.100s%s\"",
              text, strlen(text) > 100 ? "..." : "");
 
     // Build JSON request for Google Cloud Text-to-Speech API
@@ -765,62 +626,95 @@ esp_err_t gemini_tts_streaming(const char *text, gemini_tts_playback_callback_t 
              "https://texttospeech.googleapis.com/v1/text:synthesize?key=%s",
              s_config.api_key);
 
-    // Initialize streaming context for real-time audio decoding
-    streaming_tts_response_t stream_ctx = {0};
-    streaming_base64_decoder_t decoder = {0};
-    streaming_base64_decoder_init(&decoder);
-
-    stream_ctx.decoder = &decoder;
-    stream_ctx.callback = callback;
-    stream_ctx.user_data = user_data;
-    stream_ctx.in_audio_content = false;
-    stream_ctx.in_quoted_string = false;
-    stream_ctx.escape_next = false;
-
-    // Perform HTTP request with streaming event handler
-    esp_http_client_config_t config = {
-        .url = url,
-        .event_handler = http_event_handler_streaming_tts,
-        .user_data = &stream_ctx,
-        .timeout_ms = 30000,
-        .skip_cert_common_name_check = false,
-        .crt_bundle_attach = esp_crt_bundle_attach,
-        .is_async = false,
-        .disable_auto_redirect = false,
-    };
-
-    esp_http_client_handle_t client = esp_http_client_init(&config);
-    if (!client) {
-        ESP_LOGE(TAG, "Failed to initialize HTTP client");
-        free(payload);
-        return ESP_FAIL;
+    // Allocate large PSRAM buffer for entire JSON response
+    // TTS responses are typically 50-200KB JSON with base64-encoded audio
+    const size_t JSON_BUFFER_SIZE = 512 * 1024;  // 512KB in PSRAM
+    http_buffer_t response = {0};
+    response.data = heap_caps_malloc(JSON_BUFFER_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!response.data) {
+        ESP_LOGW(TAG, "PSRAM allocation failed, trying internal RAM");
+        response.data = heap_caps_malloc(JSON_BUFFER_SIZE, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+        if (!response.data) {
+            ESP_LOGE(TAG, "Failed to allocate %zu bytes for TTS response", JSON_BUFFER_SIZE);
+            free(payload);
+            return ESP_ERR_NO_MEM;
+        }
     }
+    response.cap = JSON_BUFFER_SIZE;
+    response.len = 0;
+    ESP_LOGI(TAG, "Allocated %zu byte PSRAM buffer for TTS response", JSON_BUFFER_SIZE);
 
-    esp_http_client_set_method(client, HTTP_METHOD_POST);
-    esp_http_client_set_header(client, "Content-Type", "application/json");
-    esp_http_client_set_post_field(client, payload, strlen(payload));
-
-    int64_t start_time = esp_timer_get_time();
-    esp_err_t err = esp_http_client_perform(client);
-    int64_t elapsed_us = esp_timer_get_time() - start_time;
-
-    int status_code = esp_http_client_get_status_code(client);
-    ESP_LOGI(TAG, "TTS HTTP response: %d (took %lld ms)", status_code, elapsed_us / 1000);
-
-    esp_http_client_cleanup(client);
+    // Perform HTTP request - store entire response
+    esp_err_t err = http_post_json_with_auth(url, payload, NULL, &response);
     free(payload);
 
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "HTTP POST failed: %s", esp_err_to_name(err));
+        free(response.data);
         return err;
     }
 
-    if (status_code / 100 != 2) {
-        ESP_LOGE(TAG, "HTTP request failed with status %d", status_code);
+    // Parse JSON response to extract base64 audio content
+    cJSON *json_root = cJSON_ParseWithLength((const char *)response.data, response.len);
+    if (!json_root) {
+        ESP_LOGE(TAG, "Failed to parse JSON response");
+        free(response.data);
         return ESP_FAIL;
     }
 
-    ESP_LOGI(TAG, "✅ [Gemini TTS Streaming] Complete");
+    cJSON *audio_content = cJSON_GetObjectItem(json_root, "audioContent");
+    if (!audio_content || !cJSON_IsString(audio_content)) {
+        ESP_LOGE(TAG, "Missing or invalid audioContent in response");
+        cJSON_Delete(json_root);
+        free(response.data);
+        return ESP_FAIL;
+    }
+
+    const char *base64_audio = audio_content->valuestring;
+    size_t base64_len = strlen(base64_audio);
+    ESP_LOGI(TAG, "Extracted base64 audio: %zu characters", base64_len);
+
+    // Decode base64 to PCM audio - allocate in PSRAM
+    // Base64 encoding increases size by ~33%, so decoded size is ~75% of base64 size
+    // For safety, allocate full base64 size (will be smaller after decode)
+    size_t audio_buffer_size = (base64_len * 3) / 4 + 1024;  // Add padding for safety
+    int16_t *audio_samples = (int16_t *)heap_caps_malloc(audio_buffer_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!audio_samples) {
+        ESP_LOGW(TAG, "PSRAM allocation for audio failed, trying internal RAM");
+        audio_samples = (int16_t *)heap_caps_malloc(audio_buffer_size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+        if (!audio_samples) {
+            ESP_LOGE(TAG, "Failed to allocate %zu bytes for decoded audio", audio_buffer_size);
+            cJSON_Delete(json_root);
+            free(response.data);
+            return ESP_ERR_NO_MEM;
+        }
+    }
+
+    size_t decoded_len = 0;
+    int mbedtls_ret = mbedtls_base64_decode((unsigned char *)audio_samples, audio_buffer_size, &decoded_len,
+                                            (const unsigned char *)base64_audio, base64_len);
+    cJSON_Delete(json_root);
+    free(response.data);
+
+    if (mbedtls_ret != 0) {
+        ESP_LOGE(TAG, "Base64 decode failed: %d", mbedtls_ret);
+        free(audio_samples);
+        return ESP_FAIL;
+    }
+
+    size_t sample_count = decoded_len / sizeof(int16_t);
+    ESP_LOGI(TAG, "Decoded %zu bytes (%zu samples) of PCM audio", decoded_len, sample_count);
+
+    // Call callback with complete audio data
+    esp_err_t callback_ret = callback(audio_samples, sample_count, user_data);
+    free(audio_samples);
+
+    if (callback_ret != ESP_OK) {
+        ESP_LOGW(TAG, "TTS callback returned error: %s", esp_err_to_name(callback_ret));
+        return callback_ret;
+    }
+
+    ESP_LOGI(TAG, "✅ [Gemini TTS] Complete - %zu samples delivered", sample_count);
     return ESP_OK;
 }
 

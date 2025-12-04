@@ -497,27 +497,9 @@ void app_main(void)
     ESP_ERROR_CHECK(led_strip_clear(s_strip));
     vTaskDelay(pdMS_TO_TICKS(500));
     
-    // Play log sweep once as startup indicator
-    ESP_LOGI(TAG, "=== Playing log sweep test tone ===");
-
-    if (audio_err == ESP_OK) {
-        play_log_sweep_pcm();
-    } else {
-        ESP_LOGW(TAG, "Skipping audio (audio player not initialized)");
-        // Just animate LEDs
-        for (int i = 0; i < 100; i++) {
-            float progress = (float)i / 100.0f;
-            update_leds_for_audio(progress, true);
-            vTaskDelay(pdMS_TO_TICKS(50));
-        }
-        update_leds_for_audio(0.0f, false);
-    }
-    
-    ESP_LOGI(TAG, "=== Sweep playback complete - entering voice assistant mode ===");
-
-    // Test offline welcome message (simple audio test without WiFi)
-    ESP_LOGI(TAG, "=== Testing offline welcome message ===");
-    vTaskDelay(pdMS_TO_TICKS(1000));
+    // Play offline welcome message first (simple audio test without WiFi)
+    ESP_LOGI(TAG, "=== Playing offline welcome message ===");
+    vTaskDelay(pdMS_TO_TICKS(500));
 
     {
         const uint8_t *offline_wav = _binary_offline_welcome_wav_start;
@@ -540,7 +522,26 @@ void app_main(void)
         }
     }
 
-    ESP_LOGI(TAG, "=== Offline audio test complete ===");
+    ESP_LOGI(TAG, "=== Offline welcome complete ===");
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    
+    // Play log sweep once as startup indicator
+    ESP_LOGI(TAG, "=== Playing log sweep test tone ===");
+
+    if (audio_err == ESP_OK) {
+        play_log_sweep_pcm();
+    } else {
+        ESP_LOGW(TAG, "Skipping audio (audio player not initialized)");
+        // Just animate LEDs
+        for (int i = 0; i < 100; i++) {
+            float progress = (float)i / 100.0f;
+            update_leds_for_audio(progress, true);
+            vTaskDelay(pdMS_TO_TICKS(50));
+        }
+        update_leds_for_audio(0.0f, false);
+    }
+    
+    ESP_LOGI(TAG, "=== Sweep playback complete - entering voice assistant mode ===");
     vTaskDelay(pdMS_TO_TICKS(1000));
 
     // Test TTS with welcome message (graceful fallback if offline/no WiFi)

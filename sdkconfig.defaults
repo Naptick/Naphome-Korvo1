@@ -24,3 +24,23 @@ CONFIG_WIFI_PASSWORD="thechateau"
 
 # Set target to ESP32-S3 (Korvo1 has ESP32-S3, not ESP32)
 CONFIG_IDF_TARGET="esp32s3"
+
+# Enable PSRAM (8MB external RAM) - required for TTS buffers
+# ESP32-S3-WROOM-1 uses Octal SPI PSRAM (8-line interface)
+# Reference: https://github.com/espressif/esp-skainet/blob/master/docs/en/hw-reference/esp32s3/user-guide-korvo-1.md
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_TYPE_AUTO=y
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_USE_MALLOC=y
+CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=16384
+CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
+CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=32768
+CONFIG_SPIRAM_USE_CAPS_ALLOC=y
+CONFIG_SPIRAM_MEMTEST=y
+
+# Increase main task stack size to prevent stack overflow during TTS
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=16384
+
+# WiFi Configuration - disable AP mode features we don't need
+CONFIG_ESP_WIFI_SOFTAP_BEACON_MAX_LEN=752

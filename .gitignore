@@ -30,7 +30,11 @@ Thumbs.db
 
 # Measurements
 measurements/
+# Ignore WAV files except embedded ones needed for build
 *.wav
+!/256kMeasSweep_0_to_20000_-12_dBFS_44k_Float_LR_refL.wav
+!/256kMeasSweep_0_to_20000_-12_dBFS_48k_Float_LR_refL.wav
+!/offline_welcome.wav
 
 # Dependencies
 dependencies.lock
