@@ -105,7 +105,8 @@ static esp_err_t http_event_handler_streaming_tts(esp_http_client_event_t *evt)
             static size_t total_base64_chars = 0;
             static size_t base64_start_offset = 0;
 
-            for (size_t i = 0; i < data_len; i++) {
+            size_t i = 0;
+            while (i < data_len) {
                 // If we haven't found audioContent yet, search for it
                 if (!ctx->in_audio_content) {
                     // Look for the literal pattern: "audioContent":"
@@ -114,10 +115,10 @@ static esp_err_t http_event_handler_streaming_tts(esp_http_client_event_t *evt)
                         ctx->in_audio_content = true;
                         base64_start_offset = i + 16;
                         total_base64_chars = 0;
-                        i += 16;  // Jump past marker to first base64 char
-                        // Don't continue here - process the character at i+16
-                        // Fall through to next iteration which will process first base64 char
+                        i += 16;  // Jump past marker to first base64 char - no loop increment
+                        continue;  // Go back to while to process the first base64 char
                     } else {
+                        i++;
                         continue;  // No marker found, keep searching
                     }
                 }
@@ -188,6 +189,7 @@ static esp_err_t http_event_handler_streaming_tts(esp_http_client_event_t *evt)
                             }
                         }
                     }
+                    i++;  // Move to next character
                 }
             }
             break;
