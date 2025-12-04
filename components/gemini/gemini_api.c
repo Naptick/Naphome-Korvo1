@@ -136,11 +136,11 @@ static esp_err_t http_post_json_with_auth(const char *url, const char *json_data
     // TTS responses are base64-encoded (35-50KB raw response, ~26-37KB after base64 decode)
     // LLM responses are JSON text (~20-40KB)
     // Device has only ~250KB free heap, so be conservative
-    size_t RESPONSE_BUFFER_SIZE = 40 * 1024;  // Default 40KB for LLM
+    size_t RESPONSE_BUFFER_SIZE = 128 * 1024;  // Default 128KB for LLM
 
-    // Check if this is a TTS request (slightly larger buffer)
+    // Check if this is a TTS request (use large buffer)
     if (strstr(url, "texttospeech") != NULL) {
-        RESPONSE_BUFFER_SIZE = 72 * 1024;  // TTS: 72KB (base64-encoded audio ~65.5KB + JSON envelope)
+        RESPONSE_BUFFER_SIZE = 256 * 1024;  // TTS: 256KB (with PSRAM enabled, plenty of margin)
     }
 
     if (!response->data) {
