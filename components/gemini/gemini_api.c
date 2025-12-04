@@ -163,9 +163,11 @@ static esp_err_t http_post_json_with_auth(const char *url, const char *json_data
                 response->cap = MINIMUM_SIZE;
             } else {
                 response->cap = FALLBACK_SIZE;
+                ESP_LOGI(TAG, "Using fallback buffer: %zu bytes", FALLBACK_SIZE);
             }
         } else {
             response->cap = RESPONSE_BUFFER_SIZE;
+            ESP_LOGI(TAG, "Successfully allocated %zu byte response buffer", RESPONSE_BUFFER_SIZE);
         }
         response->len = 0;
         ESP_LOGD(TAG, "Allocated response buffer: %zu bytes", response->cap);
