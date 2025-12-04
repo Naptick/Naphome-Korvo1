@@ -656,10 +656,14 @@ esp_err_t gemini_tts_streaming(const char *text, gemini_tts_playback_callback_t 
         return ESP_ERR_NO_MEM;
     }
 
+    // Verify response looks like valid JSON before parsing
+    ESP_LOGD(TAG, "Response buffer: len=%u, cap=%u, first_char='%c'",
+             http_response.len, http_response.cap, http_response.data[0]);
+
     cJSON *response_json = cJSON_Parse((char *)http_response.data);
 
     if (!response_json) {
-        ESP_LOGE(TAG, "Failed to parse JSON response");
+        ESP_LOGE(TAG, "Failed to parse JSON response (len=%u, cap=%u)", http_response.len, http_response.cap);
         // Log first 200 chars of response for debugging
         if (http_response.data && http_response.len > 0) {
             char debug_buf[201];
