@@ -15,6 +15,8 @@ The Korvo1 firmware supports loading MP3 files from an SD card. The device will 
 - **Capacity**: Any size (tested with 2GB - 32GB cards)
 - **File System**: Must be formatted as FAT32/FAT16 (not exFAT or NTFS)
 
+**📋 Need to format your SD card?** See [FORMAT_SD_CARD.md](./FORMAT_SD_CARD.md) for detailed formatting instructions.
+
 ## Hardware Connection
 
 The Korvo1 supports SD cards via:
