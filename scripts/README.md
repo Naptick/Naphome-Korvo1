@@ -1,3 +1,21 @@
+# Scripts
+
+Utility scripts for the Korvo1 project.
+
+## SD Card Setup
+
+### `copy_sounds_to_sdcard.sh`
+Copies all MP3 files to an SD card for use with the Korvo1 device.
+
+**Usage:**
+```bash
+./copy_sounds_to_sdcard.sh /path/to/mounted/sdcard
+```
+
+See [SD_CARD_SETUP.md](./SD_CARD_SETUP.md) for detailed instructions.
+
+---
+
 # Audio Measurement Scripts
 
 Scripts to automate audio measurements with REW or command-line tools.

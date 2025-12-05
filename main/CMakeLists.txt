@@ -6,6 +6,10 @@ idf_component_register(
         "wake_word_manager.c"
         "voice_assistant.c"
         "wifi_manager.c"
+        "action_manager.c"
+        "led_indicators.c"
+        "webserver.c"
+        "audio_file_manager.c"
     INCLUDE_DIRS "."
     REQUIRES
         led_strip
@@ -13,14 +17,22 @@ idf_component_register(
         korvo1
         openwakeword
         gemini
+        esp_codec_dev
         driver
         freertos
         nvs_flash
         esp_http_client
+        esp_http_server
         json
         esp_wifi
         esp_netif
         lwip
+        mdns
+        somnus_ble
+        somnus_profile
+        sensor_manager
+        spiffs
+        fatfs
     EMBED_FILES
         "../256kMeasSweep_0_to_20000_-12_dBFS_48k_Float_LR_refL.wav"
         "../offline_welcome.wav"

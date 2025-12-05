@@ -1,0 +1,55 @@
+# Training configuration for "Hey Nap" wake word model
+# This config is for the full OpenWakeWord training pipeline
+
+# Target wake word/phrase
+target_phrase: ["hey nap"]
+
+# Model configuration
+model_name: "hey_nap"
+model_type: "dnn"  # "dnn" or "rnn"
+layer_size: 128
+n_blocks: 1
+
+# Training data generation
+n_samples: 100000  # Number of positive training samples to generate
+n_samples_val: 10000  # Number of validation samples
+
+# TTS configuration (Piper)
+# You need to install Piper TTS and set this path
+# See: https://github.com/rhasspy/piper
+piper_sample_generator_path: "./piper_sample_generator"  # Update this path
+
+# Output directory
+output_dir: "./models"
+
+# Data augmentation
+augmentation_rounds: 1
+augmentation_batch_size: 16
+
+# Background audio and RIR paths
+# These are required for data augmentation
+# You can download datasets or leave empty for minimal augmentation
+rir_paths: []  # Room impulse response datasets
+background_paths: []  # Background audio datasets
+background_paths_duplication_rate: [1]
+
+# Custom negative phrases (adversarial examples)
+custom_negative_phrases: []
+
+# Training parameters
+steps: 10000
+max_negative_weight: 10
+target_false_positives_per_hour: 0.5
+
+# TTS batch size
+tts_batch_size: 16
+
+# Feature data files (for additional negative data)
+# These should point to pre-computed feature files from large datasets
+# Leave empty if you don't have additional negative data
+feature_data_files: {}
+
+# False positive validation data
+# This should be a path to a large negative dataset for validation
+# You can use pre-computed features or generate your own
+false_positive_validation_data_path: ""  # Update with path to validation data

@@ -11,6 +11,11 @@
 #define i2c_master_dev_handle_t i2c_cmd_handle_t
 #include "esp_check.h"
 #include "esp_log.h"
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+#include "driver/i2s_std.h"
+#else
+#include "driver/i2s.h"
+#endif
 
 #define AUDIO_PLAYER_I2C_FREQ_HZ 100000
 #define ES8311_ADDR_7BIT 0x18  // 7-bit I2C address (becomes 0x30 when shifted for 8-bit)
@@ -56,6 +61,9 @@ typedef struct {
     i2c_master_dev_handle_t i2c_dev;
     audio_eq_t eq_left;   // EQ for left channel
     audio_eq_t eq_right;  // EQ for right channel
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+    i2s_chan_handle_t tx_handle;  // I2S TX channel handle (ESP-IDF 5.x)
+#endif
 } audio_player_state_t;
 
 static audio_player_state_t s_audio;
@@ -310,12 +318,57 @@ static esp_err_t es8311_init(void)
     // Using 0xE0 for good volume without distortion
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_SYSTEM_REG11, 0xE0), TAG, "sys 11 set SPKOUT volume"); // Enable SPKOUT (bit 7=1) + volume
     vTaskDelay(pdMS_TO_TICKS(10)); // Delay after setting volume
-    // Read back to verify
+    // Read back to verify and retry if bit 7 is not set
     uint8_t reg11_readback = 0;
+    int retry_count = 0;
+    const int max_retries = 5;
+    while (retry_count < max_retries) {
+        if (es8311_read_reg(ES8311_SYSTEM_REG11, &reg11_readback) == ESP_OK) {
+            ESP_LOGI(TAG, "REG11 readback attempt %d: 0x%02x", retry_count + 1, reg11_readback);
+            if ((reg11_readback & 0x80) != 0) {
+                ESP_LOGI(TAG, "✅ REG11 bit 7 is set (SPKOUT enabled)");
+                break; // Success
+            }
+        }
+        
+        // Bit 7 is not set, try to force enable
+        ESP_LOGW(TAG, "REG11 bit 7 is 0, attempting to force enable (attempt %d/%d)...", 
+                 retry_count + 1, max_retries);
+        
+        // Write 0xFF (max volume, ensure enable bit is set)
+        es8311_write_reg(ES8311_SYSTEM_REG11, 0xFF);
+        vTaskDelay(pdMS_TO_TICKS(20));
+        
+        // Verify it was written
+        uint8_t verify = 0;
+        if (es8311_read_reg(ES8311_SYSTEM_REG11, &verify) == ESP_OK) {
+            ESP_LOGI(TAG, "REG11 after writing 0xFF: 0x%02x", verify);
+            if ((verify & 0x80) != 0) {
+                // Success! Now set to desired volume but keep enable bit
+                es8311_write_reg(ES8311_SYSTEM_REG11, 0xE0);
+                vTaskDelay(pdMS_TO_TICKS(10));
+                if (es8311_read_reg(ES8311_SYSTEM_REG11, &reg11_readback) == ESP_OK) {
+                    if ((reg11_readback & 0x80) != 0) {
+                        ESP_LOGI(TAG, "✅ REG11 successfully set to 0x%02x (SPKOUT enabled)", reg11_readback);
+                        break;
+                    }
+                }
+            }
+        }
+        
+        retry_count++;
+        vTaskDelay(pdMS_TO_TICKS(50)); // Wait before retry
+    }
+    
+    // Final check
     if (es8311_read_reg(ES8311_SYSTEM_REG11, &reg11_readback) == ESP_OK) {
-        ESP_LOGI(TAG, "REG11 written=0x%02x, readback=0x%02x", 0xE0, reg11_readback);
         if ((reg11_readback & 0x80) == 0) {
-            ESP_LOGW(TAG, "WARNING: REG11 bit 7 is 0 (SPKOUT may be disabled)!");
+            ESP_LOGE(TAG, "❌ CRITICAL: REG11 bit 7 still 0 after %d attempts! Speaker will not work!", max_retries);
+            ESP_LOGE(TAG, "   This may indicate a hardware issue or register conflict");
+            ESP_LOGE(TAG, "   REG11 readback: 0x%02x (expected bit 7=1)", reg11_readback);
+            ESP_LOGE(TAG, "   Note: Audio may still work if REG0F enables SPKOUT path");
+        } else {
+            ESP_LOGI(TAG, "✅ REG11 final value: 0x%02x (SPKOUT enabled)", reg11_readback);
         }
     }
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_ADC_REG15, 0x40), TAG, "adc 15");
@@ -438,6 +491,33 @@ static esp_err_t configure_i2c(const audio_player_config_t *cfg)
 
 static esp_err_t configure_i2s(const audio_player_config_t *cfg)
 {
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+    // ESP-IDF 5.x: Use new I2S driver API
+    i2s_chan_config_t chan_cfg = I2S_CHANNEL_DEFAULT_CONFIG(cfg->i2s_port, I2S_ROLE_MASTER);
+    chan_cfg.auto_clear = true;  // Auto clear the legacy data in the DMA buffer
+    ESP_RETURN_ON_ERROR(i2s_new_channel(&chan_cfg, &s_audio.tx_handle, NULL), TAG, "create I2S TX channel failed");
+    
+    i2s_std_config_t std_cfg = {
+        .clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(cfg->default_sample_rate),
+        .slot_cfg = I2S_STD_PHILIPS_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT, I2S_SLOT_MODE_STEREO),
+        .gpio_cfg = {
+            .mclk = cfg->mclk_gpio,
+            .bclk = cfg->bclk_gpio,
+            .ws = cfg->lrclk_gpio,
+            .dout = cfg->data_gpio,
+            .din = I2S_GPIO_UNUSED,
+            .invert_flags = {
+                .mclk_inv = false,
+                .bclk_inv = false,
+                .ws_inv = false,
+            },
+        },
+    };
+    ESP_RETURN_ON_ERROR(i2s_channel_init_std_mode(s_audio.tx_handle, &std_cfg), TAG, "init I2S std mode failed");
+    ESP_RETURN_ON_ERROR(i2s_channel_enable(s_audio.tx_handle), TAG, "enable I2S channel failed");
+    ESP_LOGI(TAG, "I2S driver started on port %d (ESP-IDF 5.x)", cfg->i2s_port);
+#else
+    // ESP-IDF 4.x: Use legacy I2S driver API
     i2s_config_t i2s_conf = {
         .mode = I2S_MODE_MASTER | I2S_MODE_TX,
         .sample_rate = cfg->default_sample_rate,
@@ -464,7 +544,8 @@ static esp_err_t configure_i2s(const audio_player_config_t *cfg)
     ESP_RETURN_ON_ERROR(i2s_set_pin(cfg->i2s_port, &pin_conf), TAG, "i2s pins");
     ESP_RETURN_ON_ERROR(i2s_zero_dma_buffer(cfg->i2s_port), TAG, "i2s zero");
     ESP_RETURN_ON_ERROR(i2s_start(cfg->i2s_port), TAG, "i2s start"); // Start I2S driver
-    ESP_LOGI(TAG, "I2S driver started on port %d", cfg->i2s_port);
+    ESP_LOGI(TAG, "I2S driver started on port %d (ESP-IDF 4.x)", cfg->i2s_port);
+#endif
     return ESP_OK;
 }
 
@@ -504,6 +585,14 @@ static esp_err_t ensure_sample_rate(int sample_rate_hz)
     if (sample_rate_hz == s_audio.current_sample_rate) {
         return ESP_OK;
     }
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+    // ESP-IDF 5.x: Disable channel, reconfigure clock, then re-enable
+    ESP_RETURN_ON_ERROR(i2s_channel_disable(s_audio.tx_handle), TAG, "disable channel for reconfig");
+    i2s_std_clk_config_t clk_cfg = I2S_STD_CLK_DEFAULT_CONFIG(sample_rate_hz);
+    ESP_RETURN_ON_ERROR(i2s_channel_reconfig_std_clock(s_audio.tx_handle, &clk_cfg), TAG, "reconfig clock");
+    ESP_RETURN_ON_ERROR(i2s_channel_enable(s_audio.tx_handle), TAG, "re-enable channel after reconfig");
+#else
+    // ESP-IDF 4.x: Use legacy API
     ESP_RETURN_ON_ERROR(
         i2s_set_clk(s_audio.cfg.i2s_port,
                     sample_rate_hz,
@@ -511,6 +600,7 @@ static esp_err_t ensure_sample_rate(int sample_rate_hz)
                     I2S_CHANNEL_STEREO),
         TAG,
         "set clk");
+#endif
     s_audio.current_sample_rate = sample_rate_hz;
     ESP_LOGI(TAG, "Playback sample rate -> %d Hz", sample_rate_hz);
     return ESP_OK;
@@ -566,11 +656,21 @@ static esp_err_t write_pcm_frames(const int16_t *samples, size_t sample_count, i
         
         while (total_written < bytes_to_write) {
             size_t bytes_written = 0;
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+            // ESP-IDF 5.x: Use new I2S channel write API
+            esp_err_t err = i2s_channel_write(s_audio.tx_handle,
+                                               (uint8_t *)stereo_buffer + total_written,
+                                               bytes_to_write - total_written,
+                                               &bytes_written,
+                                               portMAX_DELAY);
+#else
+            // ESP-IDF 4.x: Use legacy API
             esp_err_t err = i2s_write(s_audio.cfg.i2s_port,
                                       (uint8_t *)stereo_buffer + total_written,
                                       bytes_to_write - total_written,
                                       &bytes_written,
                                       portMAX_DELAY);
+#endif
             if (err != ESP_OK) {
                 ESP_LOGE(TAG, "I2S write failed: %s", esp_err_to_name(err));
                 return err;
@@ -986,7 +1086,17 @@ void audio_player_shutdown(void)
     if (!s_audio.initialized) {
         return;
     }
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+    // ESP-IDF 5.x: Disable and delete channel
+    if (s_audio.tx_handle) {
+        i2s_channel_disable(s_audio.tx_handle);
+        i2s_del_channel(s_audio.tx_handle);
+        s_audio.tx_handle = NULL;
+    }
+#else
+    // ESP-IDF 4.x: Use legacy API
     i2s_driver_uninstall(s_audio.cfg.i2s_port);
+#endif
     
     // Clean up I2C
     if (s_audio.i2c_bus != I2C_NUM_MAX) {

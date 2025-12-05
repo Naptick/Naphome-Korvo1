@@ -2,6 +2,8 @@
 
 ESP32-S3 firmware for Korvo1 development board featuring LED control and audio playback with log sweep test tones.
 
+🌐 **[View Full Features List →](https://naptick.github.io/Naphome-Korvo1/features.html)**
+
 ## Features
 
 - **LED Control**: WS2812 RGB LED ring control with configurable brightness and animations

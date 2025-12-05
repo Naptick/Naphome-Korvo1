@@ -1,0 +1,4 @@
+## IDF Component Manager Manifest File
+dependencies:
+  esp_codec_dev: ~1.1.0
+  espressif/mdns: ^1.2.0

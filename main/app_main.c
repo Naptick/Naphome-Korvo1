@@ -12,6 +12,16 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "led_strip.h"
+#include "led_indicators.h"
+#include "action_manager.h"
+#include "webserver.h"
+#include "mdns.h"
+#ifdef CONFIG_BT_ENABLED
+#include "somnus_ble.h"
+#endif
+#include "sensor_integration.h"
+#include "audio_file_manager.h"
+#include "esp_task_wdt.h"
 // WAV file is embedded via EMBED_FILES
 // Access it via the generated symbol (ESP-IDF generates these symbols automatically)
 extern const uint8_t _binary_256kMeasSweep_0_to_20000__12_dBFS_48k_Float_LR_refL_wav_start[] asm("_binary_256kMeasSweep_0_to_20000__12_dBFS_48k_Float_LR_refL_wav_start");
@@ -22,9 +32,72 @@ extern const uint8_t _binary_offline_welcome_wav_start[] asm("_binary_offline_we
 extern const uint8_t _binary_offline_welcome_wav_end[] asm("_binary_offline_welcome_wav_end");
 #include "mp3_decoder.h"
 #include "nvs_flash.h"
+#include "esp_spiffs.h"
+#include "esp_vfs_fat.h"
+#include "driver/sdmmc_host.h"
+#include "driver/sdspi_host.h"
+#include "sdmmc_cmd.h"
+#include "driver/spi_common.h"
 #include "driver/i2s.h"
+#include <sys/stat.h>
 
 static const char *TAG = "korvo1_led_audio";
+
+// Webserver handle
+static webserver_t *s_webserver = NULL;
+
+// BLE WiFi connect callback
+static bool ble_wifi_connect_cb(const char *ssid, const char *password, const char *user_token, bool is_production, void *ctx)
+{
+    (void)user_token;  // Not used for now
+    (void)is_production;  // Not used for now
+    (void)ctx;
+    
+    ESP_LOGI(TAG, "BLE: Connecting to WiFi: %s", ssid);
+    
+    wifi_manager_config_t wifi_cfg = {
+        .ssid = {0},
+        .password = {0}
+    };
+    strncpy(wifi_cfg.ssid, ssid, sizeof(wifi_cfg.ssid) - 1);
+    strncpy(wifi_cfg.password, password, sizeof(wifi_cfg.password) - 1);
+    
+    esp_err_t err = wifi_manager_connect(&wifi_cfg);
+    if (err == ESP_OK) {
+        char ip_str[16];
+        if (wifi_manager_get_ip(ip_str, sizeof(ip_str)) == ESP_OK) {
+            ESP_LOGI(TAG, "BLE: WiFi connected, IP: %s", ip_str);
+            
+            // Initialize mDNS after BLE WiFi connection
+            esp_err_t mdns_err = mdns_init();
+            if (mdns_err == ESP_OK) {
+                mdns_hostname_set("nap");
+                mdns_instance_name_set("Korvo1 Voice Assistant");
+                mdns_service_add(NULL, "_http", "_tcp", 80, NULL, 0);
+                ESP_LOGI(TAG, "✅ mDNS configured for nap.local");
+            }
+            
+            // Start webserver if not already started
+            if (!s_webserver) {
+                webserver_config_t ws_cfg = { .port = 80 };
+                webserver_start(&s_webserver, &ws_cfg);
+            }
+            
+            return true;
+        }
+    }
+    
+    ESP_LOGE(TAG, "BLE: WiFi connection failed: %s", esp_err_to_name(err));
+    return false;
+}
+
+// BLE device command callback
+static esp_err_t ble_device_command_cb(const char *payload, void *ctx)
+{
+    (void)ctx;
+    ESP_LOGI(TAG, "BLE: Received device command: %s", payload);
+    return action_manager_execute_json(payload);
+}
 
 // Audio monitor for microphone input (used for LED reactivity)
 static TaskHandle_t s_audio_monitor_task = NULL;
@@ -343,6 +416,15 @@ static void audio_monitor_task(void *pvParameters)
 
 void app_main(void)
 {
+    // Initialize and configure task watchdog timer with longer timeout for initialization
+    esp_task_wdt_config_t wdt_config = {
+        .timeout_ms = 30 * 1000,  // 30 seconds for initialization
+        .idle_core_mask = 0,
+        .trigger_panic = true
+    };
+    esp_task_wdt_init(&wdt_config);
+    esp_task_wdt_add(NULL);  // Add current task to watchdog
+    
     ESP_LOGI(TAG, "Korvo1 LED and Audio Test");
     ESP_LOGI(TAG, "LEDs: %d pixels on GPIO %d (brightness=%d)",
              CONFIG_LED_AUDIO_LED_COUNT, CONFIG_LED_AUDIO_STRIP_GPIO, CONFIG_LED_AUDIO_BRIGHTNESS);
@@ -355,6 +437,88 @@ void app_main(void)
         ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
+    
+    // Feed watchdog before SPIFFS init
+    esp_task_wdt_reset();
+    
+    // Initialize SPIFFS for MP3 file storage (fallback if SD card not available)
+    esp_vfs_spiffs_conf_t spiffs_conf = {
+        .base_path = "/spiffs",
+        .partition_label = "storage",  // Match partition name from partitions.csv
+        .max_files = 10,
+        .format_if_mount_failed = true  // Format if not formatted (first boot)
+    };
+    ret = esp_vfs_spiffs_register(&spiffs_conf);
+    if (ret != ESP_OK) {
+        if (ret == ESP_FAIL) {
+            ESP_LOGW(TAG, "Failed to mount or format SPIFFS filesystem");
+        } else if (ret == ESP_ERR_NOT_FOUND) {
+            ESP_LOGW(TAG, "SPIFFS partition 'storage' not found - MP3 files will use SD card if available");
+        } else {
+            ESP_LOGW(TAG, "Failed to initialize SPIFFS (%s)", esp_err_to_name(ret));
+        }
+    } else {
+        size_t total = 0, used = 0;
+        ret = esp_spiffs_info("storage", &total, &used);
+        if (ret == ESP_OK) {
+            ESP_LOGI(TAG, "✅ SPIFFS mounted: %zu KB total, %zu KB used", total / 1024, used / 1024);
+        }
+    }
+    
+    // Initialize SD card for MP3 file storage (primary storage)
+    // Try SDMMC mode first (1-bit mode, most compatible)
+    esp_vfs_fat_sdmmc_mount_config_t mount_config = {
+        .format_if_mount_failed = false,
+        .max_files = 5,
+        .allocation_unit_size = 16 * 1024
+    };
+    
+    const char mount_point[] = "/sdcard";
+    sdmmc_card_t *card = NULL;
+    bool sd_card_mounted = false;
+    
+    // Feed watchdog before SD card init
+    esp_task_wdt_reset();
+    
+    // Try SDMMC host (1-bit mode) - with shorter timeout to fail faster
+    ESP_LOGI(TAG, "Initializing SD card (SDMMC mode)...");
+    vTaskDelay(pdMS_TO_TICKS(50));  // Yield to prevent watchdog
+    
+    sdmmc_host_t host = SDMMC_HOST_DEFAULT();
+    host.flags = SDMMC_HOST_FLAG_1BIT;  // Use 1-bit mode for compatibility
+    host.max_freq_khz = SDMMC_FREQ_DEFAULT;
+    
+    sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
+    // Note: GPIO pins may need adjustment based on hardware
+    // Common SDMMC pins: CLK=GPIO14, CMD=GPIO15, D0=GPIO2, D1=GPIO4, D2=GPIO12, D3=GPIO13
+    // For 1-bit mode, only CLK, CMD, and D0 are needed
+    
+    // Try mount with timeout - if no card, fail quickly
+    ret = esp_vfs_fat_sdmmc_mount(mount_point, &host, &slot_config, &mount_config, &card);
+    if (ret == ESP_OK) {
+        sd_card_mounted = true;
+        sdmmc_card_print_info(stdout, card);
+        ESP_LOGI(TAG, "✅ SD card mounted at %s", mount_point);
+    } else {
+        ESP_LOGW(TAG, "SDMMC mount failed: %s (no SD card detected)", esp_err_to_name(ret));
+        // Skip SPI mode attempt - if SDMMC fails, card likely not present
+        // This saves time and prevents watchdog
+        ESP_LOGW(TAG, "SD card not available - MP3 files will use SPIFFS");
+    }
+    
+    if (sd_card_mounted) {
+        // Create sounds directory on SD card if it doesn't exist
+        struct stat st = {0};
+        char sounds_path[64];
+        snprintf(sounds_path, sizeof(sounds_path), "%s/sounds", mount_point);
+        if (stat(sounds_path, &st) == -1) {
+            // Directory doesn't exist, try to create it
+            // Note: mkdir may not be available, but we'll try
+            ESP_LOGI(TAG, "SD card sounds directory will be created when files are copied");
+        } else {
+            ESP_LOGI(TAG, "SD card sounds directory exists: %s", sounds_path);
+        }
+    }
     
     // Initialize LED strip
     led_strip_config_t strip_cfg = {
@@ -376,6 +540,18 @@ void app_main(void)
     ESP_ERROR_CHECK(led_strip_clear(s_strip));
     ESP_LOGI(TAG, "LED strip initialized");
     
+    // Initialize LED indicators and pass the strip handle
+    led_indicators_init();
+    led_indicators_set_strip(s_strip);
+    
+    // Initialize action manager and pass the strip handle
+    action_manager_init();
+    action_manager_set_led_strip(s_strip);
+    
+    // Feed watchdog before audio player init (can take time)
+    esp_task_wdt_reset();
+    vTaskDelay(pdMS_TO_TICKS(10));
+    
     // Initialize audio player
     esp_err_t audio_err = audio_player_init(&s_audio_config);
     if (audio_err != ESP_OK) {
@@ -384,6 +560,26 @@ void app_main(void)
     } else {
         ESP_LOGI(TAG, "Audio player initialized");
     }
+    
+    // Initialize BLE for WiFi onboarding (before WiFi connection)
+#ifdef CONFIG_BT_ENABLED
+    somnus_ble_config_t ble_cfg = {
+        .connect_cb = ble_wifi_connect_cb,
+        .connect_ctx = NULL,
+        .device_command_cb = ble_device_command_cb,
+        .device_command_ctx = NULL
+    };
+    
+    esp_err_t ble_err = somnus_ble_start(&ble_cfg);
+    if (ble_err != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to start BLE service: %s (continuing without BLE)", esp_err_to_name(ble_err));
+    } else {
+        ESP_LOGI(TAG, "✅ BLE service started - ready for WiFi onboarding");
+        ESP_LOGI(TAG, "   Mobile app can scan WiFi and connect via BLE");
+    }
+#else
+    ESP_LOGI(TAG, "BLE disabled in build configuration - skipping BLE initialization");
+#endif
     
     // Initialize WiFi (required for Gemini API)
     wifi_manager_init();
@@ -404,6 +600,54 @@ void app_main(void)
             char ip_str[16];
             if (wifi_manager_get_ip(ip_str, sizeof(ip_str)) == ESP_OK) {
                 ESP_LOGI(TAG, "WiFi connected, IP: %s", ip_str);
+                
+                // Initialize mDNS
+                esp_err_t mdns_err = mdns_init();
+                if (mdns_err != ESP_OK) {
+                    ESP_LOGW(TAG, "Failed to initialize mDNS: %s", esp_err_to_name(mdns_err));
+                } else {
+                    // Set hostname
+                    mdns_err = mdns_hostname_set("nap");
+                    if (mdns_err != ESP_OK) {
+                        ESP_LOGW(TAG, "Failed to set mDNS hostname: %s", esp_err_to_name(mdns_err));
+                    } else {
+                        ESP_LOGI(TAG, "mDNS hostname set to: nap.local");
+                    }
+                    
+                    // Set default instance
+                    mdns_err = mdns_instance_name_set("Korvo1 Voice Assistant");
+                    if (mdns_err != ESP_OK) {
+                        ESP_LOGW(TAG, "Failed to set mDNS instance name: %s", esp_err_to_name(mdns_err));
+                    }
+                    
+                    // Add HTTP service
+                    mdns_service_add(NULL, "_http", "_tcp", 80, NULL, 0);
+                    ESP_LOGI(TAG, "✅ mDNS service advertised");
+                }
+                
+                // Start webserver after WiFi is connected
+                webserver_config_t ws_cfg = {
+                    .port = 80
+                };
+                esp_err_t ws_err = webserver_start(&s_webserver, &ws_cfg);
+                if (ws_err != ESP_OK) {
+                    ESP_LOGW(TAG, "Failed to start webserver: %s", esp_err_to_name(ws_err));
+                } else {
+                    ESP_LOGI(TAG, "✅ Webserver started - access dashboard at http://nap.local/ or http://%s/", ip_str);
+                }
+                
+                // Initialize and start sensor integration (publishes to naptick API)
+                esp_err_t sensor_err = sensor_integration_init();
+                if (sensor_err != ESP_OK) {
+                    ESP_LOGW(TAG, "Failed to initialize sensor integration: %s", esp_err_to_name(sensor_err));
+                } else {
+                    sensor_err = sensor_integration_start();
+                    if (sensor_err != ESP_OK) {
+                        ESP_LOGW(TAG, "Failed to start sensor integration: %s", esp_err_to_name(sensor_err));
+                    } else {
+                        ESP_LOGI(TAG, "✅ Sensor integration started - publishing to naptick API");
+                    }
+                }
             }
         }
     } else {
@@ -440,6 +684,15 @@ void app_main(void)
     #else
     ESP_LOGW(TAG, "⚠️  Gemini API key configuration not available - rebuild with menuconfig");
     #endif
+    
+    // Initialize audio file manager (for MP3 playback)
+    esp_err_t afm_err = audio_file_manager_init();
+    if (afm_err != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to initialize audio file manager: %s", esp_err_to_name(afm_err));
+    } else {
+        size_t track_count = audio_file_manager_get_count();
+        ESP_LOGI(TAG, "✅ Audio file manager initialized with %zu tracks", track_count);
+    }
     
     // Initialize wake word detection
     // Korvo1 uses I2S1 for microphone (ES7210 ADC) - separate from I2S0 (speaker/ES8311)
@@ -496,6 +749,10 @@ void app_main(void)
     ESP_LOGI(TAG, "=== Playing offline welcome message ===");
     vTaskDelay(pdMS_TO_TICKS(500));
 
+    // Pause wake word detection during playback to prevent feedback loop
+    // The microphone would pick up the speaker output and trigger false wake words
+    wake_word_manager_pause();
+
     {
         const uint8_t *offline_wav = _binary_offline_welcome_wav_start;
         size_t offline_wav_size = _binary_offline_welcome_wav_end - _binary_offline_welcome_wav_start;
@@ -516,6 +773,9 @@ void app_main(void)
             }
         }
     }
+    
+    // Resume wake word detection after playback completes
+    wake_word_manager_resume();
 
     ESP_LOGI(TAG, "=== Offline welcome complete ===");
     vTaskDelay(pdMS_TO_TICKS(1000));

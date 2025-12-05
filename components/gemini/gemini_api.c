@@ -76,8 +76,22 @@ static esp_err_t build_wav_from_pcm(const int16_t *pcm, size_t sample_count, int
     size_t data_bytes = sample_count * sizeof(int16_t);
     size_t total_bytes = 44 + data_bytes; // WAV header (44 bytes) + data
     
-    uint8_t *wav = malloc(total_bytes);
+    // For large WAV files (>64KB), prefer PSRAM to avoid stack/heap issues
+    uint8_t *wav = NULL;
+    if (total_bytes > 64 * 1024) {
+        wav = (uint8_t *)heap_caps_malloc(total_bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (!wav) {
+            ESP_LOGW(TAG, "PSRAM allocation failed for WAV (%zu bytes), trying internal RAM", total_bytes);
+        }
+    }
+    
+    // Fallback to internal RAM if PSRAM failed or buffer is small
     if (!wav) {
+        wav = (uint8_t *)malloc(total_bytes);
+    }
+    
+    if (!wav) {
+        ESP_LOGE(TAG, "Failed to allocate %zu bytes for WAV file", total_bytes);
         return ESP_ERR_NO_MEM;
     }
     
@@ -110,17 +124,33 @@ static esp_err_t build_wav_from_pcm(const int16_t *pcm, size_t sample_count, int
     return ESP_OK;
 }
 
-// Base64 encode with allocation
+// Base64 encode with allocation (prefer PSRAM for large buffers)
 static esp_err_t base64_encode_alloc(const uint8_t *input, size_t input_len, char **out_str)
 {
     if (!input || !out_str) {
         return ESP_ERR_INVALID_ARG;
     }
     size_t target_len = ((input_len + 2) / 3) * 4 + 1;
-    char *encoded = malloc(target_len);
+    
+    // For large buffers (>64KB), prefer PSRAM
+    char *encoded = NULL;
+    if (target_len > 64 * 1024) {
+        encoded = (char *)heap_caps_malloc(target_len, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (!encoded) {
+            ESP_LOGW(TAG, "PSRAM allocation failed for base64 buffer (%zu bytes), trying internal RAM", target_len);
+        }
+    }
+    
+    // Fallback to internal RAM if PSRAM failed or buffer is small
     if (!encoded) {
+        encoded = (char *)malloc(target_len);
+    }
+    
+    if (!encoded) {
+        ESP_LOGE(TAG, "Failed to allocate %zu bytes for base64 encoding", target_len);
         return ESP_ERR_NO_MEM;
     }
+    
     size_t written = 0;
     int ret = mbedtls_base64_encode((unsigned char *)encoded, target_len, &written, input, input_len);
     if (ret != 0) {
@@ -276,8 +306,8 @@ esp_err_t gemini_stt(const int16_t *audio_data, size_t audio_len, char *text_out
     }
     
     float duration_sec = 16000 > 0 ? (float)audio_len / 16000.0f : 0.0f;
-    ESP_LOGI(TAG, "🔊 [Gemini STT] Starting transcription: %zu samples @ 16000 Hz (%.2f sec)", 
-             audio_len, duration_sec);
+    // Use simpler log format to avoid potential stack issues with large values
+    ESP_LOGI(TAG, "[Gemini STT] Starting: %zu samples, %.1fs", audio_len, duration_sec);
     
     // Validate audio - check if it's all zeros (silence)
     int32_t sum = 0;
@@ -566,6 +596,154 @@ esp_err_t gemini_llm(const char *prompt, char *response, size_t response_len)
     
     cJSON_Delete(response_json);
     ESP_LOGE(TAG, "❌ [Gemini LLM] Failed to extract text from response");
+    return ESP_FAIL;
+}
+
+esp_err_t gemini_llm_with_functions(const char *prompt, const char *tools_json,
+                                     char *response, size_t response_len,
+                                     gemini_function_call_t *function_call)
+{
+    if (!s_initialized) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    
+    if (!prompt || !response) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    // Initialize function_call output
+    if (function_call) {
+        memset(function_call, 0, sizeof(gemini_function_call_t));
+    }
+    
+    ESP_LOGI(TAG, "💬 [Gemini LLM] Generating response with functions: \"%.100s%s\"", 
+             prompt, strlen(prompt) > 100 ? "..." : "");
+    
+    // Build JSON request for Gemini API
+    cJSON *root = cJSON_CreateObject();
+    cJSON *contents = cJSON_CreateArray();
+    cJSON *content = cJSON_CreateObject();
+    cJSON *parts = cJSON_CreateArray();
+    cJSON *part = cJSON_CreateObject();
+    
+    cJSON_AddItemToObject(root, "contents", contents);
+    cJSON_AddItemToArray(contents, content);
+    cJSON_AddItemToObject(content, "parts", parts);
+    cJSON_AddItemToArray(parts, part);
+    cJSON_AddStringToObject(part, "text", prompt);
+    
+    // Add tools if provided
+    if (tools_json && strlen(tools_json) > 0) {
+        cJSON *tools = cJSON_Parse(tools_json);
+        if (tools) {
+            cJSON_AddItemToObject(root, "tools", tools);
+            ESP_LOGI(TAG, "Added function definitions to request");
+        } else {
+            ESP_LOGW(TAG, "Failed to parse tools_json, continuing without functions");
+        }
+    }
+    
+    char *payload = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    if (!payload) {
+        ESP_LOGE(TAG, "Failed to create JSON payload");
+        return ESP_ERR_NO_MEM;
+    }
+    
+    // Gemini API endpoint
+    char url[512];
+    snprintf(url, sizeof(url), 
+             "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s",
+             s_config.model, s_config.api_key);
+    
+    // Perform HTTP request
+    http_buffer_t http_response = {0};
+    char auth_header[256];
+    snprintf(auth_header, sizeof(auth_header), "X-Goog-Api-Key: %s", s_config.api_key);
+    
+    esp_err_t ret = http_post_json_with_auth(url, payload, NULL, &http_response);
+    free(payload);
+    
+    if (ret != ESP_OK) {
+        if (http_response.data) free(http_response.data);
+        return ret;
+    }
+    
+    // Parse response
+    if (!http_response.data || http_response.len == 0) {
+        ESP_LOGE(TAG, "Empty response");
+        if (http_response.data) free(http_response.data);
+        return ESP_FAIL;
+    }
+    
+    http_response.data = realloc(http_response.data, http_response.len + 1);
+    http_response.data[http_response.len] = '\0';
+    
+    cJSON *response_json = cJSON_Parse((char *)http_response.data);
+    free(http_response.data);
+    
+    if (!response_json) {
+        ESP_LOGE(TAG, "Failed to parse JSON response");
+        return ESP_FAIL;
+    }
+    
+    // Extract text or function call from Gemini response
+    cJSON *candidates = cJSON_GetObjectItem(response_json, "candidates");
+    if (candidates && cJSON_IsArray(candidates) && cJSON_GetArraySize(candidates) > 0) {
+        cJSON *candidate = cJSON_GetArrayItem(candidates, 0);
+        if (candidate) {
+            cJSON *content_obj = cJSON_GetObjectItem(candidate, "content");
+            if (content_obj) {
+                cJSON *parts = cJSON_GetObjectItem(content_obj, "parts");
+                if (parts && cJSON_IsArray(parts) && cJSON_GetArraySize(parts) > 0) {
+                    // Check for function call first
+                    cJSON *part = cJSON_GetArrayItem(parts, 0);
+                    if (part) {
+                        cJSON *function_call_obj = cJSON_GetObjectItem(part, "functionCall");
+                        if (function_call_obj && function_call) {
+                            // Function call detected
+                            cJSON *name = cJSON_GetObjectItem(function_call_obj, "name");
+                            cJSON *args = cJSON_GetObjectItem(function_call_obj, "args");
+                            
+                            if (name && cJSON_IsString(name)) {
+                                strncpy(function_call->function_name, name->valuestring,
+                                       sizeof(function_call->function_name) - 1);
+                                
+                                if (args) {
+                                    char *args_str = cJSON_PrintUnformatted(args);
+                                    if (args_str) {
+                                        strncpy(function_call->arguments, args_str,
+                                               sizeof(function_call->arguments) - 1);
+                                        free(args_str);
+                                    }
+                                }
+                                
+                                function_call->is_function_call = true;
+                                cJSON_Delete(response_json);
+                                ESP_LOGI(TAG, "🔧 [Gemini LLM] Function call detected: %s", 
+                                         function_call->function_name);
+                                return ESP_ERR_NOT_FOUND;  // Special return to indicate function call
+                            }
+                        }
+                        
+                        // No function call, extract text
+                        cJSON *text = cJSON_GetObjectItem(part, "text");
+                        if (text && cJSON_IsString(text)) {
+                            strncpy(response, text->valuestring, response_len - 1);
+                            response[response_len - 1] = '\0';
+                            cJSON_Delete(response_json);
+                            ESP_LOGI(TAG, "✅ [Gemini LLM] Success: \"%.200s%s\"", 
+                                     response, strlen(response) > 200 ? "..." : "");
+                            return ESP_OK;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    cJSON_Delete(response_json);
+    ESP_LOGE(TAG, "❌ [Gemini LLM] Failed to extract text or function call from response");
     return ESP_FAIL;
 }
 

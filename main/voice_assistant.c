@@ -2,6 +2,8 @@
 #include "gemini_api.h"
 #include "wake_word_manager.h"
 #include "audio_player.h"
+#include "action_manager.h"
+#include "wake_word_manager.h"  // For pause/resume during playback
 #include "esp_log.h"
 #include "esp_heap_caps.h"
 #include "freertos/FreeRTOS.h"
@@ -9,6 +11,7 @@
 #include "freertos/queue.h"
 #include <string.h>
 #include <stdlib.h>
+#include "cJSON.h"
 
 static const char *TAG = "voice_assistant";
 
@@ -53,7 +56,164 @@ __attribute__((unused)) static void on_wake_word_detected(const char *wake_word)
     // 3. Send to voice_assistant_process_command()
 }
 
-// Process complete voice command: STT -> LLM -> TTS -> Playback
+// Function definitions for Gemini (matching SomnusDevice actions)
+static const char *get_function_definitions_json(void)
+{
+    return 
+    "{"
+    "\"functionDeclarations\": ["
+        "{"
+            "\"name\": \"set_led_color\","
+            "\"description\": \"Set LED strip to a solid color. Use this to change the LED color based on user requests.\","
+            "\"parameters\": {"
+                "\"type\": \"object\","
+                "\"properties\": {"
+                    "\"red\": {\"type\": \"integer\", \"description\": \"Red component (0-255)\"},"
+                    "\"green\": {\"type\": \"integer\", \"description\": \"Green component (0-255)\"},"
+                    "\"blue\": {\"type\": \"integer\", \"description\": \"Blue component (0-255)\"}"
+                "},"
+                "\"required\": [\"red\", \"green\", \"blue\"]"
+            "}"
+        "},"
+        "{"
+            "\"name\": \"set_led_pattern\","
+            "\"description\": \"Set LED strip to a pattern like rainbow or clear. Use for special effects.\","
+            "\"parameters\": {"
+                "\"type\": \"object\","
+                "\"properties\": {"
+                    "\"pattern\": {\"type\": \"string\", \"enum\": [\"rainbow\", \"clear\"], \"description\": \"Pattern name\"}"
+                "},"
+                "\"required\": [\"pattern\"]"
+            "}"
+        "},"
+        "{"
+            "\"name\": \"set_led_intensity\","
+            "\"description\": \"Set LED brightness/intensity (0.0 to 1.0). Use when user asks to dim or brighten LEDs.\","
+            "\"parameters\": {"
+                "\"type\": \"object\","
+                "\"properties\": {"
+                    "\"intensity\": {\"type\": \"number\", \"description\": \"Intensity from 0.0 (off) to 1.0 (max)\"}"
+                "},"
+                "\"required\": [\"intensity\"]"
+            "}"
+        "},"
+        "{"
+            "\"name\": \"set_volume\","
+            "\"description\": \"Set audio volume (0.0 to 1.0). Use when user asks to change volume.\","
+            "\"parameters\": {"
+                "\"type\": \"object\","
+                "\"properties\": {"
+                    "\"volume\": {\"type\": \"number\", \"description\": \"Volume from 0.0 (mute) to 1.0 (max)\"}"
+                "},"
+                "\"required\": [\"volume\"]"
+            "}"
+        "},"
+        "{"
+            "\"name\": \"pause_device\","
+            "\"description\": \"Pause the device (stop audio and clear LEDs). Use when user asks to pause or stop.\","
+            "\"parameters\": {"
+                "\"type\": \"object\","
+                "\"properties\": {},"
+                "\"required\": []"
+            "}"
+        "},"
+        "{"
+            "\"name\": \"resume_device\","
+            "\"description\": \"Resume the device (restore audio and LEDs). Use when user asks to play or resume.\","
+            "\"parameters\": {"
+                "\"type\": \"object\","
+                "\"properties\": {},"
+                "\"required\": []"
+            "}"
+        "}"
+    "]"
+    "}";
+}
+
+// Convert Gemini function call to action_manager action
+static esp_err_t execute_function_call(const gemini_function_call_t *func_call)
+{
+    if (!func_call || !func_call->is_function_call) {
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    ESP_LOGI(TAG, "🔧 Executing function call: %s with args: %s", 
+             func_call->function_name, func_call->arguments);
+    
+    // Parse function arguments
+    cJSON *args = cJSON_Parse(func_call->arguments);
+    if (!args) {
+        ESP_LOGE(TAG, "Failed to parse function arguments");
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    esp_err_t ret = ESP_OK;
+    
+    // Map function names to actions
+    if (strcmp(func_call->function_name, "set_led_color") == 0) {
+        cJSON *r = cJSON_GetObjectItem(args, "red");
+        cJSON *g = cJSON_GetObjectItem(args, "green");
+        cJSON *b = cJSON_GetObjectItem(args, "blue");
+        
+        if (r && g && b && cJSON_IsNumber(r) && cJSON_IsNumber(g) && cJSON_IsNumber(b)) {
+            char pattern_json[256];
+            snprintf(pattern_json, sizeof(pattern_json),
+                    "{\"color\": [%d, %d, %d]}",
+                    r->valueint, g->valueint, b->valueint);
+            
+            action_t action = {
+                .type = ACTION_LED,
+            };
+            strncpy(action.data.led.pattern_data, pattern_json, sizeof(action.data.led.pattern_data) - 1);
+            ret = action_manager_execute(&action);
+        }
+    } else if (strcmp(func_call->function_name, "set_led_pattern") == 0) {
+        cJSON *pattern = cJSON_GetObjectItem(args, "pattern");
+        if (pattern && cJSON_IsString(pattern)) {
+            char pattern_json[256];
+            snprintf(pattern_json, sizeof(pattern_json),
+                    "{\"pattern\": \"%s\"}", pattern->valuestring);
+            
+            action_t action = {
+                .type = ACTION_LED,
+            };
+            strncpy(action.data.led.pattern_data, pattern_json, sizeof(action.data.led.pattern_data) - 1);
+            ret = action_manager_execute(&action);
+        }
+    } else if (strcmp(func_call->function_name, "set_led_intensity") == 0) {
+        cJSON *intensity = cJSON_GetObjectItem(args, "intensity");
+        if (intensity && cJSON_IsNumber(intensity)) {
+            action_t action = {
+                .type = ACTION_SET_LED_INTENSITY,
+                .data.led_intensity.intensity = (float)intensity->valuedouble
+            };
+            ret = action_manager_execute(&action);
+        }
+    } else if (strcmp(func_call->function_name, "set_volume") == 0) {
+        cJSON *volume = cJSON_GetObjectItem(args, "volume");
+        if (volume && cJSON_IsNumber(volume)) {
+            action_t action = {
+                .type = ACTION_SET_VOLUME,
+                .data.volume.volume = (float)volume->valuedouble
+            };
+            ret = action_manager_execute(&action);
+        }
+    } else if (strcmp(func_call->function_name, "pause_device") == 0) {
+        action_t action = { .type = ACTION_PAUSE };
+        ret = action_manager_execute(&action);
+    } else if (strcmp(func_call->function_name, "resume_device") == 0) {
+        action_t action = { .type = ACTION_PLAY };
+        ret = action_manager_execute(&action);
+    } else {
+        ESP_LOGW(TAG, "Unknown function: %s", func_call->function_name);
+        ret = ESP_ERR_NOT_FOUND;
+    }
+    
+    cJSON_Delete(args);
+    return ret;
+}
+
+// Process complete voice command: STT -> LLM (with function calling) -> Execute actions -> TTS -> Playback
 static esp_err_t process_voice_command(const int16_t *audio_data, size_t audio_len)
 {
     ESP_LOGI(TAG, "Processing voice command (%zu samples)", audio_len);
@@ -68,10 +228,40 @@ static esp_err_t process_voice_command(const int16_t *audio_data, size_t audio_l
     
     ESP_LOGI(TAG, "Transcribed: %s", transcribed_text);
     
-    // Step 2: LLM - Get response from Gemini
-    char llm_response[2048];
-    ret = gemini_llm(transcribed_text, llm_response, sizeof(llm_response));
-    if (ret != ESP_OK) {
+    // Step 2: LLM with function calling - Get response from Gemini
+    char llm_response[2048] = {0};
+    gemini_function_call_t function_call = {0};
+    const char *tools_json = get_function_definitions_json();
+    
+    ret = gemini_llm_with_functions(transcribed_text, tools_json, 
+                                     llm_response, sizeof(llm_response),
+                                     &function_call);
+    
+    // Check if LLM wants to call a function
+    if (ret == ESP_ERR_NOT_FOUND && function_call.is_function_call) {
+        ESP_LOGI(TAG, "LLM requested function call: %s", function_call.function_name);
+        
+        // Execute the function call
+        esp_err_t action_ret = execute_function_call(&function_call);
+        if (action_ret == ESP_OK) {
+            // Function executed successfully, get confirmation text
+            char confirm_prompt[1024];
+            snprintf(confirm_prompt, sizeof(confirm_prompt),
+                    "The user said: \"%s\". I executed the function %s. Provide a brief confirmation message (1-2 sentences).",
+                    transcribed_text, function_call.function_name);
+            
+            // Get text response for confirmation
+            ret = gemini_llm(confirm_prompt, llm_response, sizeof(llm_response));
+            if (ret != ESP_OK) {
+                // Fallback message
+                snprintf(llm_response, sizeof(llm_response), "Done.");
+            }
+        } else {
+            // Function execution failed
+            snprintf(llm_response, sizeof(llm_response), 
+                    "I tried to %s but encountered an error.", function_call.function_name);
+        }
+    } else if (ret != ESP_OK) {
         ESP_LOGE(TAG, "LLM failed: %s", esp_err_to_name(ret));
         return ret;
     }
@@ -117,6 +307,13 @@ esp_err_t voice_assistant_init(const voice_assistant_config_t *config)
     
     memcpy(&s_config, config, sizeof(voice_assistant_config_t));
     
+    // Initialize action manager
+    esp_err_t ret = action_manager_init();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize action manager: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    
     // Initialize Gemini API
     gemini_config_t gemini_cfg = {
         .api_key = {0},
@@ -129,9 +326,10 @@ esp_err_t voice_assistant_init(const voice_assistant_config_t *config)
         strncpy(gemini_cfg.model, "gemini-2.0-flash", sizeof(gemini_cfg.model) - 1);
     }
     
-    esp_err_t ret = gemini_api_init(&gemini_cfg);
+    ret = gemini_api_init(&gemini_cfg);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize Gemini API: %s", esp_err_to_name(ret));
+        action_manager_deinit();
         return ret;
     }
     
@@ -140,11 +338,12 @@ esp_err_t voice_assistant_init(const voice_assistant_config_t *config)
     if (!s_command_queue) {
         ESP_LOGE(TAG, "Failed to create command queue");
         gemini_api_deinit();
+        action_manager_deinit();
         return ESP_ERR_NO_MEM;
     }
     
     s_initialized = true;
-    ESP_LOGI(TAG, "Voice assistant initialized");
+    ESP_LOGI(TAG, "Voice assistant initialized with function calling support");
     return ESP_OK;
 }
 
@@ -221,6 +420,7 @@ void voice_assistant_deinit(void)
     }
     
     gemini_api_deinit();
+    action_manager_deinit();
     s_initialized = false;
     
     ESP_LOGI(TAG, "Voice assistant deinitialized");
@@ -239,6 +439,7 @@ static esp_err_t tts_playback_callback(const int16_t *samples, size_t sample_cou
 
     // Submit PCM chunk directly to audio player (24kHz, mono)
     // This avoids buffering entire audio in memory
+    // Note: Wake word detection should be paused during TTS playback to prevent feedback
     return audio_player_submit_pcm(samples, sample_count, 24000, 1);
 }
 
@@ -253,6 +454,9 @@ esp_err_t voice_assistant_test_tts(const char *text)
 
     ESP_LOGI(TAG, "🎤 Testing TTS with text: \"%s\"", text);
 
+    // Pause wake word detection during TTS playback to prevent feedback loop
+    wake_word_manager_pause();
+
     // Check available memory for diagnostics
     size_t total_free = esp_get_free_heap_size();
     size_t largest_default = heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT);
@@ -264,6 +468,9 @@ esp_err_t voice_assistant_test_tts(const char *text)
     // No need to allocate 80KB buffer for entire audio
     // Timeout is typically 30 seconds, but will fail faster if network is down
     esp_err_t ret = gemini_tts_streaming(text, tts_playback_callback, NULL);
+    
+    // Resume wake word detection after TTS completes
+    wake_word_manager_resume();
     if (ret != ESP_OK) {
         // Graceful degradation: log warning but don't crash
         // Common reasons: no internet, firewall blocks Google (China), API quota exceeded

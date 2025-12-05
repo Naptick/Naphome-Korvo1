@@ -4,10 +4,17 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
+#include "esp_heap_caps.h"
 #include <string.h>
 #include <cstdlib>
 #include <cstring>
 #include <cmath>
+
+// Forward declaration - LED indicators will be linked from main component
+extern "C" {
+    void led_indicators_speech_detected(bool active);
+    void led_indicators_wake_word_detected(void);
+}
 
 static const char *TAG = "openwakeword";
 
@@ -45,7 +52,9 @@ static void *s_model = nullptr;
 static void wake_word_task(void *pvParameters)
 {
     openwakeword_context *ctx = (openwakeword_context *)pvParameters;
-    int16_t *audio_buffer = (int16_t *)std::malloc(512 * sizeof(int16_t)); // 32ms at 16kHz
+    // Buffer size: 512 samples = 32ms at 16kHz (matches queue chunk size)
+    const size_t buffer_size = 512;
+    int16_t *audio_buffer = (int16_t *)std::malloc(buffer_size * sizeof(int16_t));
     
     if (!audio_buffer) {
         ESP_LOGE(TAG, "Failed to allocate audio buffer");
@@ -64,9 +73,9 @@ static void wake_word_task(void *pvParameters)
     static int chunk_count = 0;
     static bool first_audio_detected = false;
     static bool was_silent = true;
-    const float ENERGY_THRESHOLD = 500.0f;  // Adjust based on testing
-    const int SPEECH_CHUNKS_REQUIRED = 5;   // ~160ms of speech
-    const int SILENCE_CHUNKS_REQUIRED = 3;   // ~96ms of silence after speech
+    const float ENERGY_THRESHOLD = 5.0f;  // Lowered from 500.0 - RMS values are typically 1-15, silence ~1-2
+    const int SPEECH_CHUNKS_REQUIRED = 3;   // ~96ms of speech (reduced from 5)
+    const int SILENCE_CHUNKS_REQUIRED = 2;   // ~64ms of silence after speech (reduced from 3)
     
     ESP_LOGI(TAG, "Wake word detection task started (energy threshold: %.1f)", ENERGY_THRESHOLD);
     
@@ -76,17 +85,18 @@ static void wake_word_task(void *pvParameters)
             chunk_count++;
             
             // Calculate RMS energy of audio chunk
+            const size_t chunk_size = 512;  // Match queue chunk size
             float sum_squares = 0.0f;
             int16_t max_sample = 0;
             int16_t min_sample = 0;
-            for (size_t i = 0; i < 512; i++) {
+            for (size_t i = 0; i < chunk_size; i++) {
                 int16_t sample = audio_buffer[i];
                 if (sample > max_sample) max_sample = sample;
                 if (sample < min_sample) min_sample = sample;
                 float sample_f = (float)sample;
                 sum_squares += sample_f * sample_f;
             }
-            float rms_energy = std::sqrt(sum_squares / 512.0f);
+            float rms_energy = std::sqrt(sum_squares / (float)chunk_size);
             energy_history[history_idx] = rms_energy;
             history_idx = (history_idx + 1) % 10;
             
@@ -109,7 +119,7 @@ static void wake_word_task(void *pvParameters)
                 was_silent = true;
             }
             
-            // Log audio chunk details (every 50 chunks = ~1.6 seconds at 16kHz)
+            // Log audio chunk details (every 50 chunks = ~1.6 seconds at 16kHz with 512-sample chunks)
             if (chunk_count % 50 == 0) {
                 float avg_energy = 0.0f;
                 for (int i = 0; i < 10; i++) {
@@ -130,6 +140,8 @@ static void wake_word_task(void *pvParameters)
                 if (speech_count == 0) {
                     ESP_LOGI(TAG, "🔊 *** SPEECH DETECTED *** (energy=%.1f > threshold=%.1f) - peak=[%d, %d]",
                              rms_energy, ENERGY_THRESHOLD, min_sample, max_sample);
+                    // Show speech indicator (blue pulsing)
+                    led_indicators_speech_detected(true);
                 }
                 speech_count++;
                 if (speech_count > 0 && speech_count % 5 == 0) {
@@ -141,6 +153,8 @@ static void wake_word_task(void *pvParameters)
                 if (speech_count > 0 && silence_count == 0) {
                     ESP_LOGI(TAG, "🔇 *** SILENCE AFTER SPEECH *** (energy=%.1f <= threshold=%.1f) - had %d speech chunks",
                              rms_energy, ENERGY_THRESHOLD, speech_count);
+                    // Turn off speech indicator when silence detected
+                    led_indicators_speech_detected(false);
                 }
                 silence_count++;
                 if (speech_count >= SPEECH_CHUNKS_REQUIRED && silence_count >= SILENCE_CHUNKS_REQUIRED) {
@@ -148,6 +162,10 @@ static void wake_word_task(void *pvParameters)
                     ESP_LOGI(TAG, "✅ *** WAKE WORD DETECTED! *** (energy-based) - speech: %d chunks (~%dms), silence: %d chunks (~%dms)", 
                              speech_count, (speech_count * 512 * 1000) / ctx->sample_rate,
                              silence_count, (silence_count * 512 * 1000) / ctx->sample_rate);
+                    
+                    // Show wake word indicator (green flash)
+                    led_indicators_wake_word_detected();
+                    
                     if (ctx->callback) {
                         ctx->callback("hey_nap");
                     }
@@ -184,13 +202,22 @@ esp_err_t openwakeword_init(uint32_t sample_rate, wake_word_callback_t callback)
     s_ctx.initialized = true;
     s_ctx.running = false;
     
-    // Create audio queue
-    s_ctx.audio_queue = xQueueCreate(4, 512 * sizeof(int16_t));
+    // Create audio queue with larger size using PSRAM
+    // Queue size: 64 chunks of 512 samples each = 32ms per chunk, ~2 seconds total buffer
+    // This prevents queue overflow during processing delays
+    // Note: Using 512 samples to match mic capture task output (not 1024)
+    const size_t queue_size = 64;  // Increased from 4 to 64 for better buffering
+    const size_t chunk_size_samples = 512;  // 32ms at 16kHz (matches mic capture task)
+    s_ctx.audio_queue = xQueueCreate(queue_size, chunk_size_samples * sizeof(int16_t));
     if (!s_ctx.audio_queue) {
         ESP_LOGE(TAG, "Failed to create audio queue");
         s_ctx.initialized = false;
         return ESP_ERR_NO_MEM;
     }
+    ESP_LOGI(TAG, "Audio queue created: %zu chunks of %zu samples each (~%.1fms/chunk, ~%.1fs total buffer)",
+             queue_size, chunk_size_samples, 
+             (float)chunk_size_samples * 1000.0f / sample_rate,
+             (float)(queue_size * chunk_size_samples) / sample_rate);
     
     // TODO: Load OpenWakeWord model
     // Example:
@@ -232,17 +259,22 @@ esp_err_t openwakeword_process(const int16_t *audio_data, size_t num_samples)
     }
     
     // Send audio to processing task via queue
-    // For simplicity, we'll process in chunks of 512 samples
+    // Process in chunks of 512 samples (32ms at 16kHz) - matches queue chunk size
+    const size_t target_chunk_size = 512;
     size_t samples_processed = 0;
+    
     while (samples_processed < num_samples) {
-        size_t chunk_size = (num_samples - samples_processed > 512) ? 512 : (num_samples - samples_processed);
+        size_t chunk_size = (num_samples - samples_processed > target_chunk_size) 
+                          ? target_chunk_size 
+                          : (num_samples - samples_processed);
         
+        // Use stack allocation for small chunks (512 samples = 1KB)
         int16_t chunk[512];
         std::memcpy(chunk, audio_data + samples_processed, chunk_size * sizeof(int16_t));
         
         // Pad if needed
-        if (chunk_size < 512) {
-            std::memset(chunk + chunk_size, 0, (512 - chunk_size) * sizeof(int16_t));
+        if (chunk_size < target_chunk_size) {
+            std::memset(chunk + chunk_size, 0, (target_chunk_size - chunk_size) * sizeof(int16_t));
         }
         
         // Send to queue (non-blocking)

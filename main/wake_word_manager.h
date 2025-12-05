@@ -32,6 +32,16 @@ void wake_word_manager_stop(void);
 bool wake_word_manager_is_active(void);
 
 /**
+ * Pause wake word detection (e.g., during audio playback to prevent feedback)
+ */
+void wake_word_manager_pause(void);
+
+/**
+ * Resume wake word detection after pausing
+ */
+void wake_word_manager_resume(void);
+
+/**
  * Deinitialize wake word manager
  */
 void wake_word_manager_deinit(void);

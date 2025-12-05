@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Naphome-Korvo1 Features</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            line-height: 1.6;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 60px 40px;
+            text-align: center;
+        }
+        
+        header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        header p {
+            font-size: 1.3em;
+            opacity: 0.95;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .intro {
+            text-align: center;
+            margin-bottom: 50px;
+            padding-bottom: 30px;
+            border-bottom: 2px solid #eee;
+        }
+        
+        .intro h2 {
+            color: #667eea;
+            font-size: 2em;
+            margin-bottom: 15px;
+        }
+        
+        .intro p {
+            font-size: 1.1em;
+            color: #666;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-top: 40px;
+        }
+        
+        .feature-card {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            transition: transform 0.3s, box-shadow 0.3s;
+            border: 2px solid transparent;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.2);
+            border-color: #667eea;
+        }
+        
+        .feature-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+            display: block;
+        }
+        
+        .feature-card h3 {
+            color: #667eea;
+            font-size: 1.5em;
+            margin-bottom: 15px;
+        }
+        
+        .feature-card p {
+            color: #666;
+            line-height: 1.8;
+            margin-bottom: 15px;
+        }
+        
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .feature-list li {
+            padding: 8px 0;
+            padding-left: 25px;
+            position: relative;
+            color: #555;
+        }
+        
+        .feature-list li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #4CAF50;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+        
+        .tech-stack {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 40px;
+            border-radius: 15px;
+            margin-top: 50px;
+        }
+        
+        .tech-stack h2 {
+            color: #667eea;
+            font-size: 2em;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+        
+        .tech-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        
+        .tech-item {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .tech-item strong {
+            color: #667eea;
+            display: block;
+            margin-bottom: 8px;
+            font-size: 1.1em;
+        }
+        
+        .cta {
+            text-align: center;
+            margin-top: 50px;
+            padding: 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+        }
+        
+        .cta h2 {
+            margin-bottom: 20px;
+            font-size: 2em;
+        }
+        
+        .cta a {
+            display: inline-block;
+            padding: 15px 40px;
+            background: white;
+            color: #667eea;
+            text-decoration: none;
+            border-radius: 50px;
+            font-weight: bold;
+            margin: 10px;
+            transition: transform 0.3s;
+        }
+        
+        .cta a:hover {
+            transform: scale(1.05);
+        }
+        
+        footer {
+            text-align: center;
+            padding: 30px;
+            color: #999;
+            border-top: 1px solid #eee;
+        }
+        
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 2em;
+            }
+            
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .content {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎤 Naphome-Korvo1</h1>
+            <p>Advanced Voice Assistant & Smart Device Platform</p>
+        </header>
+        
+        <div class="content">
+            <div class="intro">
+                <h2>Powerful Features for Modern Smart Homes</h2>
+                <p>
+                    Naphome-Korvo1 is a comprehensive ESP32-S3 based voice assistant platform 
+                    featuring AI-powered voice interactions, device control, sensor monitoring, 
+                    and a beautiful web interface. Built for the Korvo1 development board.
+                </p>
+            </div>
+            
+            <div class="features-grid">
+                <div class="feature-card">
+                    <span class="feature-icon">🎙️</span>
+                    <h3>Voice Assistant</h3>
+                    <p>
+                        Full-featured voice assistant powered by Google Gemini AI with 
+                        speech-to-text, natural language processing, and text-to-speech.
+                    </p>
+                    <ul class="feature-list">
+                        <li>Google Gemini 2.5 Flash integration</li>
+                        <li>Real-time speech recognition</li>
+                        <li>Natural language understanding</li>
+                        <li>Streaming text-to-speech</li>
+                        <li>Function calling for device control</li>
+                    </ul>
+                </div>
+                
+                <div class="feature-card">
+                    <span class="feature-icon">👂</span>
+                    <h3>Wake Word Detection</h3>
+                    <p>
+                        Always-on wake word detection using OpenWakeWord, enabling 
+                        hands-free voice activation.
+                    </p>
+                    <ul class="feature-list">
+                        <li>OpenWakeWord integration</li>
+                        <li>Low-power always-on listening</li>
+                        <li>Custom wake word support</li>
+                        <li>Multi-microphone support (ES7210)</li>
+                        <li>Automatic pause during playback</li>
+                    </ul>
+                </div>
+                
+                <div class="feature-card">
+                    <span class="feature-icon">💡</span>
+                    <h3>LED Control</h3>
+                    <p>
+                        Advanced RGB LED strip control with animations, color management, 
+                        and intensity control.
+                    </p>
+                    <ul class="feature-list">
+                        <li>WS2812 RGB LED support</li>
+                        <li>Rainbow animations</li>
+                        <li>Color picker interface</li>
+                        <li>Brightness control (0-100%)</li>
+                        <li>State persistence</li>
+                    </ul>
+                </div>
+                
+                <div class="feature-card">
+                    <span class="feature-icon">🎵</span>
+                    <h3>Audio Playback</h3>
+                    <p>
+                        High-quality audio playback with MP3 support, SD card storage, 
+                        and streaming capabilities.
+                    </p>
+                    <ul class="feature-list">
+                        <li>MP3 decoder (Helix)</li>
+                        <li>163+ pre-loaded tracks</li>
+                        <li>SD card support</li>
+                        <li>Drag-and-drop file upload</li>
+                        <li>Volume control</li>
+                        <li>Play/pause functionality</li>
+                    </ul>
+                </div>
+                
+                <div class="feature-card">
+                    <span class="feature-icon">🌐</span>
+                    <h3>Web Dashboard</h3>
+                    <p>
+                        Beautiful, responsive web interface for device control and monitoring 
+                        accessible via mDNS.
+                    </p>
+                    <ul class="feature-list">
+                        <li>Real-time device status</li>
+                        <li>LED control interface</li>
+                        <li>Audio player with track selection</li>
+                        <li>File upload interface</li>
+                        <li>Live console logs</li>
+                        <li>Sensor data visualization</li>
+                    </ul>
+                </div>
+                
+                <div class="feature-card">
+                    <span class="feature-icon">📡</span>
+                    <h3>BLE WiFi Provisioning</h3>
+                    <p>
+                        Easy device setup via Bluetooth Low Energy, allowing WiFi configuration 
+                        from mobile apps.
+                    </p>
+                    <ul class="feature-list">
+                        <li>NimBLE stack integration</li>
+                        <li>WiFi network scanning</li>
+                        <li>Password-free setup</li>
+                        <li>Mobile app compatible</li>
+                        <li>Secure credential storage</li>
+                    </ul>
+                </div>
+                
+                <div class="feature-card">
+                    <span class="feature-icon">🌡️</span>
+                    <h3>Sensor Integration</h3>
+                    <p>
+                        Comprehensive environmental sensor support with cloud data publishing 
+                        to Naptick API.
+                    </p>
+                    <ul class="feature-list">
+                        <li>SHT4x (Temperature/Humidity)</li>
+                        <li>CM1106S (CO2)</li>
+                        <li>PM2012 (PM1.0/2.5/10, VOC)</li>
+                        <li>TSL2561 (Light)</li>
+                        <li>AS7341 (UV Index)</li>
+                        <li>VEML7700 (Ambient Light)</li>
+                        <li>Synthetic data fallback</li>
+                        <li>Cloud API integration</li>
+                    </ul>
+                </div>
+                
+                <div class="feature-card">
+                    <span class="feature-icon">💾</span>
+                    <h3>Storage & File Management</h3>
+                    <p>
+                        Flexible storage options with SD card and SPIFFS support, plus 
+                        convenient file upload capabilities.
+                    </p>
+                    <ul class="feature-list">
+                        <li>SD card support (SDMMC/SPI)</li>
+                        <li>SPIFFS filesystem</li>
+                        <li>Drag-and-drop file upload</li>
+                        <li>Automatic file organization</li>
+                        <li>163+ MP3 tracks included</li>
+                    </ul>
+                </div>
+                
+                <div class="feature-card">
+                    <span class="feature-icon">🔧</span>
+                    <h3>Device Actions</h3>
+                    <p>
+                        Extensible action system allowing voice and web control of device 
+                        functions through a unified API.
+                    </p>
+                    <ul class="feature-list">
+                        <li>LED pattern control</li>
+                        <li>Volume adjustment</li>
+                        <li>Play/pause audio</li>
+                        <li>Function calling from LLM</li>
+                        <li>RESTful API</li>
+                        <li>JSON-based commands</li>
+                    </ul>
+                </div>
+                
+                <div class="feature-card">
+                    <span class="feature-icon">🔍</span>
+                    <h3>Network Discovery</h3>
+                    <p>
+                        Easy device discovery and access through mDNS, making the device 
+                        accessible via a friendly hostname.
+                    </p>
+                    <ul class="feature-list">
+                        <li>mDNS (Multicast DNS)</li>
+                        <li>Accessible at nap.local</li>
+                        <li>Automatic service discovery</li>
+                        <li>No IP address needed</li>
+                    </ul>
+                </div>
+                
+                <div class="feature-card">
+                    <span class="feature-icon">📊</span>
+                    <h3>Monitoring & Logging</h3>
+                    <p>
+                        Comprehensive logging and monitoring capabilities for debugging 
+                        and system insights.
+                    </p>
+                    <ul class="feature-list">
+                        <li>Real-time log streaming</li>
+                        <li>Circular log buffer (PSRAM)</li>
+                        <li>Web-based log viewer</li>
+                        <li>Auto-refresh logs</li>
+                        <li>Color-coded log levels</li>
+                    </ul>
+                </div>
+                
+                <div class="feature-card">
+                    <span class="feature-icon">⚡</span>
+                    <h3>Performance & Optimization</h3>
+                    <p>
+                        Optimized for the ESP32-S3 platform with efficient memory usage 
+                        and performance tuning.
+                    </p>
+                    <ul class="feature-list">
+                        <li>PSRAM utilization (8MB)</li>
+                        <li>Optimized audio buffers</li>
+                        <li>Efficient task scheduling</li>
+                        <li>Watchdog protection</li>
+                        <li>Low-latency audio processing</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="tech-stack">
+                <h2>Technology Stack</h2>
+                <div class="tech-grid">
+                    <div class="tech-item">
+                        <strong>Hardware</strong>
+                        ESP32-S3 (Korvo1)
+                    </div>
+                    <div class="tech-item">
+                        <strong>Framework</strong>
+                        ESP-IDF
+                    </div>
+                    <div class="tech-item">
+                        <strong>AI/ML</strong>
+                        Google Gemini
+                    </div>
+                    <div class="tech-item">
+                        <strong>Audio</strong>
+                        Helix MP3, ES8311
+                    </div>
+                    <div class="tech-item">
+                        <strong>Wireless</strong>
+                        WiFi, BLE (NimBLE)
+                    </div>
+                    <div class="tech-item">
+                        <strong>Storage</strong>
+                        SD Card, SPIFFS
+                    </div>
+                    <div class="tech-item">
+                        <strong>Web</strong>
+                        HTTP Server, mDNS
+                    </div>
+                    <div class="tech-item">
+                        <strong>Language</strong>
+                        C/C++
+                    </div>
+                </div>
+            </div>
+            
+            <div class="cta">
+                <h2>Get Started</h2>
+                <p style="margin-bottom: 30px; font-size: 1.2em;">
+                    Ready to build with Naphome-Korvo1? Check out the repository and documentation.
+                </p>
+                <a href="https://github.com/Naptick/Naphome-Korvo1" target="_blank">View on GitHub</a>
+                <a href="https://github.com/Naptick/Naphome-Korvo1/blob/main/README.md" target="_blank">Read Documentation</a>
+            </div>
+        </div>
+        
+        <footer>
+            <p>&copy; 2025 Naphome-Korvo1 | Built with ❤️ for smart home automation</p>
+        </footer>
+    </div>
+</body>
+</html>

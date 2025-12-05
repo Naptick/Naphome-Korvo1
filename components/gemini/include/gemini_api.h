@@ -43,6 +43,28 @@ esp_err_t gemini_stt(const int16_t *audio_data, size_t audio_len, char *text_out
 esp_err_t gemini_llm(const char *prompt, char *response, size_t response_len);
 
 /**
+ * Function call result from LLM
+ */
+typedef struct {
+    char function_name[64];
+    char arguments[512];  // JSON string
+    bool is_function_call;
+} gemini_function_call_t;
+
+/**
+ * LLM with function calling support
+ * @param prompt: Input text prompt
+ * @param tools_json: JSON string defining available functions/tools (NULL if none)
+ * @param response: Buffer to store LLM text response
+ * @param response_len: Size of response buffer
+ * @param function_call: Output function call if LLM wants to call a function (can be NULL)
+ * @return ESP_OK on success, ESP_ERR_NOT_FOUND if function call detected (check function_call)
+ */
+esp_err_t gemini_llm_with_functions(const char *prompt, const char *tools_json,
+                                     char *response, size_t response_len,
+                                     gemini_function_call_t *function_call);
+
+/**
  * Text-to-Speech: Convert text to audio using Gemini
  * @param text: Text to synthesize
  * @param audio_out: Buffer to store PCM audio samples
