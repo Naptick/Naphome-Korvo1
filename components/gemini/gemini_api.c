@@ -1122,9 +1122,13 @@ esp_err_t gemini_tts_streaming(const char *text, gemini_tts_playback_callback_t 
     const char *response_start = (const char *)response.data;
     const char *response_end = response_start + response.len;
     
-    if (base64_audio < response_start || base64_audio >= response_end) {
-        ESP_LOGE(TAG, "Base64 pointer out of bounds: base64_audio=%p, response_start=%p, response_end=%p",
-                 base64_audio, response_start, response_end);
+    // Check if pointer is within bounds
+    bool pointer_in_bounds = (base64_audio >= response_start && base64_audio < response_end);
+    
+    if (!pointer_in_bounds) {
+        ESP_LOGE(TAG, "Base64 pointer out of bounds: base64_audio=%p, response_start=%p, response_end=%p, offset=%ld",
+                 base64_audio, response_start, response_end, 
+                 base64_audio > response_start ? (long)(base64_audio - response_start) : -1);
         free(response.data);
         return ESP_FAIL;
     }
@@ -1145,8 +1149,9 @@ esp_err_t gemini_tts_streaming(const char *text, gemini_tts_playback_callback_t 
         return ESP_FAIL;
     }
     
-    ESP_LOGI(TAG, "Base64 audio validated: %zu characters (pointer=%p, buffer=[%p-%p])", 
-             base64_len, base64_audio, response_start, response_end);
+    ESP_LOGI(TAG, "Base64 audio validated: %zu characters (pointer=%p, buffer=[%p-%p], offset=%zu, available=%zu)", 
+             base64_len, base64_audio, response_start, response_end,
+             base64_audio - response_start, available_space);
     
     // Debug: Log first few bytes as hex to see what we're getting
     ESP_LOGD(TAG, "First 20 bytes of extracted base64 (hex):");
