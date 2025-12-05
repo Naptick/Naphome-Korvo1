@@ -1,42 +1,56 @@
 # GitHub Pages Documentation
 
-This directory contains the GitHub Pages site for Naphome-Korvo1.
+This directory contains documentation for GitHub Pages.
 
 ## Files
 
-- `index.html` - Landing page with navigation
-- `features.html` - Comprehensive features showcase page
+- `index.md` - Main landing page
+- `wake-word-training-results.md` - Complete training and deployment results
+- `_config.yml` - Jekyll configuration for GitHub Pages
 
-## Setup Instructions
+## Publishing to GitHub Pages
 
-To enable GitHub Pages with GitHub Actions:
+### Option 1: Automatic (Recommended)
 
-1. Go to your repository on GitHub
-2. Navigate to **Settings** → **Pages**
-3. Under **Source**, select **GitHub Actions**
-4. The site will automatically deploy when you push to the `main` branch
+1. Push to GitHub
+2. Go to: **Settings** → **Pages**
+3. Select source: **Deploy from a branch**
+4. Choose branch: `main` (or `gh-pages`)
+5. Select folder: `/docs`
+6. Click **Save**
 
-## Deployment
+GitHub will automatically build and publish the site.
 
-The site is automatically deployed via `.github/workflows/pages.yml` when:
-- Changes are pushed to the `main` branch in the `docs/` directory
-- The workflow is manually triggered
+### Option 2: Manual
 
-## Access
-
-Once deployed, the site will be available at:
-`https://naptick.github.io/Naphome-Korvo1/`
-
-## Local Development
-
-To preview the site locally:
+If you prefer to use a `gh-pages` branch:
 
 ```bash
-# Using Python
-python3 -m http.server 8000 --directory docs
-
-# Using Node.js (if you have http-server installed)
-npx http-server docs -p 8000
+git checkout -b gh-pages
+git subtree push --prefix docs origin gh-pages
 ```
 
-Then open `http://localhost:8000` in your browser.
+## Viewing Locally
+
+To preview the site locally with Jekyll:
+
+```bash
+cd docs
+bundle install
+bundle exec jekyll serve
+```
+
+Then visit: http://localhost:4000
+
+## Content
+
+The documentation includes:
+- Training results and metrics
+- Deployment status
+- Conversion pipeline details
+- Training improvement recommendations
+- Technical implementation notes
+
+---
+
+**Note:** GitHub Pages uses Jekyll by default. The `_config.yml` file configures the site theme and navigation.

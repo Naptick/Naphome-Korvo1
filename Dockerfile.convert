@@ -1,0 +1,19 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install dependencies (skip simplifier for now)
+RUN pip install --no-cache-dir \
+    tensorflow==2.15.0 \
+    onnx==1.14.1 \
+    protobuf numpy six typing-extensions PyYAML \
+    decorator \
+    dm-tree \
+    tensorflow-probability==0.23.0 && \
+    pip install --no-cache-dir onnx-tf==1.10.0 --no-deps
+
+# Copy conversion script
+COPY convert_hey_nap_docker.py .
+
+# Default command
+CMD ["python", "convert_hey_nap_docker.py"]

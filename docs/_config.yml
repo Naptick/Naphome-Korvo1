@@ -1,0 +1,23 @@
+# GitHub Pages Jekyll Configuration
+
+title: Naphome Korvo1 - Wake Word Training Results
+description: Training and deployment results for "Hey Nap" wake word model
+theme: jekyll-theme-minimal
+
+# Navigation
+navigation:
+  - title: Results
+    url: /wake-word-training-results
+  - title: GitHub
+    url: https://github.com/danielmcshan/Naphome-Korvo1
+
+# Exclude from processing
+exclude:
+  - README.md
+  - Gemfile
+  - Gemfile.lock
+  - node_modules
+  - vendor/bundle/
+  - vendor/cache/
+  - vendor/gems/
+  - vendor/ruby/
