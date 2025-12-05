@@ -16,11 +16,13 @@
 #include "action_manager.h"
 #include "webserver.h"
 #include "mdns.h"
+#include "esp_netif_sntp.h"
 #ifdef CONFIG_BT_ENABLED
 #include "somnus_ble.h"
 #endif
 #include "sensor_integration.h"
 #include "audio_file_manager.h"
+#include "environmental_report.h"
 #include "esp_task_wdt.h"
 // WAV file is embedded via EMBED_FILES
 // Access it via the generated symbol (ESP-IDF generates these symbols automatically)
@@ -706,6 +708,39 @@ void app_main(void)
             if (wifi_manager_get_ip(ip_str, sizeof(ip_str)) == ESP_OK) {
                 ESP_LOGI(TAG, "WiFi connected, IP: %s", ip_str);
                 
+                // Synchronize time with NTP (required for TLS certificate validation)
+                ESP_LOGI(TAG, "Synchronizing time with NTP servers...");
+                esp_sntp_config_t sntp_config = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
+                esp_netif_sntp_init(&sntp_config);
+                int retry = 0;
+                while (esp_netif_sntp_sync_wait(pdMS_TO_TICKS(5000)) != ESP_OK && retry < 3) {
+                    ESP_LOGW(TAG, "Waiting for system time to be set... (%d/3)", retry + 1);
+                    retry++;
+                }
+                if (retry < 3) {
+                    time_t now = 0;
+                    struct tm timeinfo = {0};
+                    time(&now);
+                    localtime_r(&now, &timeinfo);
+                    ESP_LOGI(TAG, "✅ Time synchronized: %04d-%02d-%02d %02d:%02d:%02d",
+                             timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
+                             timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+                } else {
+                    ESP_LOGW(TAG, "⚠️  Time synchronization failed - TLS certificate validation may fail");
+                }
+                esp_task_wdt_reset();  // Feed watchdog after time sync
+                
+                // Generate and speak environmental report after WiFi connection and time sync
+                // This provides a welcome message with current conditions
+                ESP_LOGI(TAG, "Generating environmental report...");
+                esp_task_wdt_reset();  // Feed watchdog before environmental report
+                esp_err_t env_report_err = environmental_report_generate_and_speak();
+                if (env_report_err != ESP_OK) {
+                    ESP_LOGW(TAG, "Failed to generate environmental report: %s (continuing anyway)", 
+                             esp_err_to_name(env_report_err));
+                }
+                esp_task_wdt_reset();  // Feed watchdog after environmental report
+                
                 // Initialize mDNS
                 esp_err_t mdns_err = mdns_init();
                 if (mdns_err != ESP_OK) {
@@ -797,8 +832,17 @@ void app_main(void)
     ESP_LOGW(TAG, "⚠️  Gemini API key configuration not available - rebuild with menuconfig");
     #endif
     
+    // Remove main task from watchdog BEFORE long-running operations (file scanning, animations)
+    // The main task will now just run animations/playback and doesn't need watchdog monitoring
+    esp_err_t wdt_del_err = esp_task_wdt_delete(NULL);
+    if (wdt_del_err == ESP_OK) {
+        ESP_LOGI(TAG, "Main task removed from watchdog - entering normal operation");
+    } else {
+        ESP_LOGW(TAG, "Failed to remove main task from watchdog: %s (will continue anyway)", esp_err_to_name(wdt_del_err));
+    }
+    
     // Initialize audio file manager (for MP3 playback)
-    esp_task_wdt_reset();  // Feed watchdog before audio file manager init
+    // Note: Main task is no longer monitored by watchdog, but we'll still feed it during scanning
     esp_err_t afm_err = audio_file_manager_init();
     if (afm_err != ESP_OK) {
         ESP_LOGW(TAG, "Failed to initialize audio file manager: %s", esp_err_to_name(afm_err));
@@ -806,11 +850,9 @@ void app_main(void)
         size_t track_count = audio_file_manager_get_count();
         ESP_LOGI(TAG, "✅ Audio file manager initialized with %zu tracks", track_count);
     }
-    esp_task_wdt_reset();  // Feed watchdog after audio file manager init
     
     // Initialize wake word detection
     // Korvo1 uses I2S1 for microphone (ES7210 ADC) - separate from I2S0 (speaker/ES8311)
-    esp_task_wdt_reset();  // Feed watchdog before wake word manager init
     esp_err_t wake_err = wake_word_manager_init();
     if (wake_err != ESP_OK) {
         ESP_LOGW(TAG, "Failed to initialize wake word manager: %s", esp_err_to_name(wake_err));
@@ -945,6 +987,7 @@ void app_main(void)
     #endif
 
     // Main loop: voice assistant mode with continuous LED effects
+    // Note: Main task has been removed from watchdog, so no need to feed it here
     while (true) {
         // Voice assistant is running in background
         // Wake word detection will trigger voice commands

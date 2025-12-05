@@ -487,8 +487,6 @@ static const char* html_dashboard =
 "}"
 "// Initial feature status check on page load"
 "setTimeout(()=>{ loadLogs(); }, 1000);"
-"// Initial feature status check on page load"
-"setTimeout(()=>{ loadLogs(); }, 1000);"
 "setInterval(()=>{ refreshAll(); if(autoRefreshLogs) loadLogs(); }, 5000);"
 "refreshAll();"
 "loadLogs();"

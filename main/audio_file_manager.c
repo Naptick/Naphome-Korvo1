@@ -15,6 +15,7 @@
 #include "driver/sdmmc_host.h"
 #include "driver/sdspi_host.h"
 #include "sdmmc_cmd.h"
+#include "esp_task_wdt.h"
 #include <string.h>
 #include <stdlib.h>
 #include <dirent.h>
@@ -157,7 +158,13 @@ static esp_err_t load_mp3_file_list(void)
 
     if (use_static_list) {
         // Use static list of known files - they may be in SPIFFS or SD card
+        // Feed watchdog periodically during file scanning
         for (size_t i = 0; i < MP3_FILE_COUNT && s_file_count < MAX_AUDIO_FILES; i++) {
+            // Feed watchdog every 10 files to prevent timeout during scanning
+            if (i % 10 == 0) {
+                esp_task_wdt_reset();
+            }
+            
             audio_file_entry_t *file = &s_audio_files[s_file_count];
             const char *name = s_mp3_file_names[i];
             

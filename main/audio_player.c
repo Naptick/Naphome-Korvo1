@@ -75,6 +75,7 @@ static esp_err_t es8311_write_reg(uint8_t reg, uint8_t value)
     if (s_audio.i2c_bus == I2C_NUM_MAX) {
         return ESP_ERR_INVALID_STATE;
     }
+    esp_task_wdt_reset(); // Feed watchdog before I2C operation
     // Use ESP-IDF v4.4 I2C API
     // ES8311_ADDR_7BIT is 7-bit address, shift to get 8-bit write address
     i2c_cmd_handle_t cmd = i2c_cmd_link_create();
@@ -85,6 +86,7 @@ static esp_err_t es8311_write_reg(uint8_t reg, uint8_t value)
     i2c_master_stop(cmd);
     esp_err_t err = i2c_master_cmd_begin(s_audio.i2c_bus, cmd, pdMS_TO_TICKS(100));
     i2c_cmd_link_delete(cmd);
+    esp_task_wdt_reset(); // Feed watchdog after I2C operation
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "ES8311 write failed reg=0x%02x val=0x%02x err=%s", reg, value, esp_err_to_name(err));
     }
@@ -96,6 +98,7 @@ static esp_err_t es8311_read_reg(uint8_t reg, uint8_t *value)
     if (s_audio.i2c_bus == I2C_NUM_MAX || value == NULL) {
         return ESP_ERR_INVALID_STATE;
     }
+    esp_task_wdt_reset(); // Feed watchdog before I2C operation
     i2c_cmd_handle_t cmd = i2c_cmd_link_create();
     i2c_master_start(cmd);
     i2c_master_write_byte(cmd, (ES8311_ADDR_7BIT << 1) | I2C_MASTER_WRITE, true);
@@ -106,6 +109,7 @@ static esp_err_t es8311_read_reg(uint8_t reg, uint8_t *value)
     i2c_master_stop(cmd);
     esp_err_t err = i2c_master_cmd_begin(s_audio.i2c_bus, cmd, pdMS_TO_TICKS(100));
     i2c_cmd_link_delete(cmd);
+    esp_task_wdt_reset(); // Feed watchdog after I2C operation
     return err;
 }
 
@@ -232,11 +236,13 @@ static esp_err_t es8311_init(void)
 {
     // Feed watchdog at start
     esp_task_wdt_reset();
+    vTaskDelay(pdMS_TO_TICKS(10)); // Yield to watchdog feed task
     
     // Probe device first
     ESP_LOGI(TAG, "Probing ES8311 at I2C address 0x%02x (7-bit)...", ES8311_ADDR_7BIT);
     esp_err_t probe_err = es8311_probe();
     esp_task_wdt_reset(); // Feed watchdog after probe
+    vTaskDelay(pdMS_TO_TICKS(10)); // Yield again
     if (probe_err != ESP_OK) {
         ESP_LOGW(TAG, "ES8311 probe failed, continuing anyway...");
     }
@@ -245,17 +251,32 @@ static esp_err_t es8311_init(void)
     // Based on ESP codec dev library implementation
     
     // Initial setup (from es8311_open)
+    ESP_LOGI(TAG, "ES8311: Writing initial registers...");
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_GPIO_REG44, 0x08), TAG, "gpio 44"); // Enhance I2C noise immunity
+    esp_task_wdt_reset();
+    vTaskDelay(pdMS_TO_TICKS(5)); // Yield between writes
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_GPIO_REG44, 0x08), TAG, "gpio 44"); // Second write for reliability
     esp_task_wdt_reset(); // Feed watchdog after first few writes
+    vTaskDelay(pdMS_TO_TICKS(5)); // Yield
     
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_CLK_MANAGER_REG01, 0x30), TAG, "clk mgr 1 init");
+    esp_task_wdt_reset();
+    vTaskDelay(pdMS_TO_TICKS(5));
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_CLK_MANAGER_REG02, 0x00), TAG, "clk mgr 2 init");
+    esp_task_wdt_reset();
+    vTaskDelay(pdMS_TO_TICKS(5));
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_CLK_MANAGER_REG03, 0x10), TAG, "clk mgr 3 init");
+    esp_task_wdt_reset();
+    vTaskDelay(pdMS_TO_TICKS(5));
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_ADC_REG16, 0x24), TAG, "adc 16 init");
+    esp_task_wdt_reset();
+    vTaskDelay(pdMS_TO_TICKS(5));
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_CLK_MANAGER_REG04, 0x10), TAG, "clk mgr 4 init");
+    esp_task_wdt_reset();
+    vTaskDelay(pdMS_TO_TICKS(5));
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_CLK_MANAGER_REG05, 0x00), TAG, "clk mgr 5 init");
     esp_task_wdt_reset(); // Feed watchdog after clock manager writes
+    vTaskDelay(pdMS_TO_TICKS(10)); // Longer yield after group
     
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_SYSTEM_REG0B, 0x00), TAG, "sys 0B init");
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_SYSTEM_REG0C, 0x00), TAG, "sys 0C init");
@@ -595,15 +616,24 @@ esp_err_t audio_player_init(const audio_player_config_t *cfg)
 
     // Feed watchdog before I2C setup
     esp_task_wdt_reset();
+    ESP_LOGI(TAG, "Configuring I2C...");
     ESP_RETURN_ON_ERROR(configure_i2c(cfg), TAG, "i2c setup");
+    esp_task_wdt_reset();
     vTaskDelay(pdMS_TO_TICKS(50)); // Give I2C bus more time to stabilize
     esp_task_wdt_reset(); // Feed watchdog after delay
+    ESP_LOGI(TAG, "I2C configured");
     
+    esp_task_wdt_reset();
+    ESP_LOGI(TAG, "Configuring I2S...");
     ESP_RETURN_ON_ERROR(configure_i2s(cfg), TAG, "i2s setup");
     esp_task_wdt_reset(); // Feed watchdog after I2S setup
+    ESP_LOGI(TAG, "I2S configured");
     
+    esp_task_wdt_reset();
+    ESP_LOGI(TAG, "Initializing ES8311 codec...");
     ESP_RETURN_ON_ERROR(es8311_init(), TAG, "codec init");
     esp_task_wdt_reset(); // Feed watchdog after codec init
+    ESP_LOGI(TAG, "ES8311 codec initialized");
 
     // Initialize EQ for both channels (enabled by default)
     // EQ will be re-initialized with actual sample rate when playback starts

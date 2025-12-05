@@ -12,6 +12,8 @@
 #include "freertos/task.h"
 #include "sdkconfig.h"
 #include "esp_http_client.h"
+#include "esp_tls.h"
+#include "esp_crt_bundle.h"
 #include "esp_timer.h"
 #include "somnus_profile.h"
 #include "cJSON.h"
@@ -333,6 +335,8 @@ static void sensor_manager_collect_and_publish(void)
         .url = "https://api-uat.naptick.com/sensor-service/sensor-service/stream",
         .event_handler = http_event_handler,
         .timeout_ms = 5000,
+        .skip_cert_common_name_check = false,  // Verify certificate CN
+        .crt_bundle_attach = esp_crt_bundle_attach,  // Use certificate bundle for verification
     };
     esp_http_client_handle_t client = esp_http_client_init(&config);
     if (client) {

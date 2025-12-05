@@ -308,11 +308,14 @@ esp_err_t voice_assistant_init(const voice_assistant_config_t *config)
     memcpy(&s_config, config, sizeof(voice_assistant_config_t));
     
     // Initialize action manager
-    esp_err_t ret = action_manager_init();
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize action manager: %s", esp_err_to_name(ret));
-        return ret;
-    }
+    // DISABLED: Temporarily disabled for debugging watchdog resets
+    // esp_err_t ret = action_manager_init();
+    // if (ret != ESP_OK) {
+    //     ESP_LOGE(TAG, "Failed to initialize action manager: %s", esp_err_to_name(ret));
+    //     return ret;
+    // }
+    ESP_LOGI(TAG, "Action manager initialization disabled for debugging");
+    esp_err_t ret = ESP_OK; // Skip action manager init
     
     // Initialize Gemini API
     gemini_config_t gemini_cfg = {
@@ -329,7 +332,7 @@ esp_err_t voice_assistant_init(const voice_assistant_config_t *config)
     ret = gemini_api_init(&gemini_cfg);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize Gemini API: %s", esp_err_to_name(ret));
-        action_manager_deinit();
+        // action_manager_deinit(); // Disabled
         return ret;
     }
     
@@ -338,7 +341,7 @@ esp_err_t voice_assistant_init(const voice_assistant_config_t *config)
     if (!s_command_queue) {
         ESP_LOGE(TAG, "Failed to create command queue");
         gemini_api_deinit();
-        action_manager_deinit();
+        // action_manager_deinit(); // Disabled
         return ESP_ERR_NO_MEM;
     }
     
@@ -420,7 +423,7 @@ void voice_assistant_deinit(void)
     }
     
     gemini_api_deinit();
-    action_manager_deinit();
+    // action_manager_deinit(); // Disabled for debugging
     s_initialized = false;
     
     ESP_LOGI(TAG, "Voice assistant deinitialized");

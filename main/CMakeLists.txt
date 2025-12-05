@@ -10,6 +10,7 @@ idf_component_register(
         "led_indicators.c"
         "webserver.c"
         "audio_file_manager.c"
+        "environmental_report.c"
     INCLUDE_DIRS "."
     REQUIRES
         led_strip
@@ -33,6 +34,7 @@ idf_component_register(
         sensor_manager
         spiffs
         fatfs
+        esp-tls
     EMBED_FILES
         "../256kMeasSweep_0_to_20000_-12_dBFS_48k_Float_LR_refL.wav"
         "../offline_welcome.wav"
