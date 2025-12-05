@@ -414,11 +414,40 @@ static void audio_monitor_task(void *pvParameters)
     vTaskDelete(NULL);
 }
 
+// Dedicated watchdog feed task for initialization
+static TaskHandle_t s_wdt_feed_task = NULL;
+static volatile bool s_init_complete = false;
+
+static void watchdog_feed_task(void *pvParameters)
+{
+    // Add this task to watchdog
+    esp_task_wdt_add(NULL);
+    
+    // Continuously feed watchdog every 50ms during initialization (very frequent)
+    // This ensures the system watchdog is fed even if main task is blocked
+    while (!s_init_complete) {
+        esp_task_wdt_reset(); // Feed this task's watchdog
+        vTaskDelay(pdMS_TO_TICKS(50)); // Feed every 50ms
+    }
+    
+    // After init, feed less frequently (every 1 second)
+    while (1) {
+        esp_task_wdt_reset();
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+
 void app_main(void)
 {
     // Add current task to watchdog (ESP-IDF already initializes it)
-    // Use default timeout - just make sure we're registered
+    // The timeout should be set via sdkconfig.defaults (30 seconds)
     esp_task_wdt_add(NULL);
+    
+    // Create dedicated watchdog feed task BEFORE any long operations
+    // Use higher priority (5) to ensure it runs even when main task is busy
+    // This ensures watchdog is fed continuously during initialization
+    xTaskCreate(watchdog_feed_task, "wdt_feed", 2048, NULL, 5, &s_wdt_feed_task);
+    vTaskDelay(pdMS_TO_TICKS(50)); // Give task time to start and run a few cycles
     
     ESP_LOGI(TAG, "Korvo1 LED and Audio Test");
     ESP_LOGI(TAG, "LEDs: %d pixels on GPIO %d (brightness=%d)",
@@ -481,12 +510,28 @@ void app_main(void)
     
     sdmmc_host_t host = SDMMC_HOST_DEFAULT();
     host.flags = SDMMC_HOST_FLAG_1BIT;  // Use 1-bit mode for compatibility
-    host.max_freq_khz = SDMMC_FREQ_DEFAULT;
+    // Use lower frequency for better compatibility with slower cards
+    host.max_freq_khz = SDMMC_FREQ_PROBING;  // Start with probing frequency (400kHz)
     
+    // Configure SDMMC slot with explicit GPIO pins
+    // NOTE: GPIO2 is used for I2C SCL, so we need different pins for SDMMC
+    // Common SDMMC pins for ESP32-S3: CLK=GPIO14, CMD=GPIO15, D0=GPIO2
+    // But since GPIO2 conflicts with I2C, check your hardware schematic
+    // For now, try default pins but with explicit configuration
     sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
-    // Note: GPIO pins may need adjustment based on hardware
-    // Common SDMMC pins: CLK=GPIO14, CMD=GPIO15, D0=GPIO2, D1=GPIO4, D2=GPIO12, D3=GPIO13
-    // For 1-bit mode, only CLK, CMD, and D0 are needed
+    
+    // If default pins conflict, you may need to set explicit pins:
+    // slot_config.clk = GPIO_NUM_14;
+    // slot_config.cmd = GPIO_NUM_15;
+    // slot_config.d0 = GPIO_NUM_2;  // WARNING: Conflicts with I2C SCL!
+    // slot_config.width = 1;  // 1-bit mode
+    
+    // Add pull-up configuration for better signal integrity
+    slot_config.gpio_cd = GPIO_NUM_NC;  // No card detect pin
+    slot_config.gpio_wp = GPIO_NUM_NC;  // No write protect pin
+    
+    ESP_LOGI(TAG, "SDMMC config: CLK=GPIO%d, CMD=GPIO%d, D0=GPIO%d, freq=%d kHz",
+             slot_config.clk, slot_config.cmd, slot_config.d0, host.max_freq_khz);
     
     // Try mount with timeout - if no card, fail quickly
     ret = esp_vfs_fat_sdmmc_mount(mount_point, &host, &slot_config, &mount_config, &card);
@@ -494,11 +539,57 @@ void app_main(void)
         sd_card_mounted = true;
         sdmmc_card_print_info(stdout, card);
         ESP_LOGI(TAG, "✅ SD card mounted at %s", mount_point);
+        
+        // After successful mount, increase frequency for better performance
+        if (card->max_freq_khz > host.max_freq_khz) {
+            ESP_LOGI(TAG, "Card supports up to %d kHz, but using %d kHz for stability",
+                     card->max_freq_khz, host.max_freq_khz);
+        }
     } else {
-        ESP_LOGW(TAG, "SDMMC mount failed: %s (no SD card detected)", esp_err_to_name(ret));
-        // Skip SPI mode attempt - if SDMMC fails, card likely not present
-        // This saves time and prevents watchdog
+        ESP_LOGE(TAG, "SDMMC mount failed: %s (0x%x)", esp_err_to_name(ret), ret);
+        ESP_LOGE(TAG, "Error details: send_op_cond timeout - card not responding");
+        ESP_LOGE(TAG, "Possible causes:");
+        ESP_LOGE(TAG, "  1. SD card not inserted or not making contact");
+        ESP_LOGE(TAG, "  2. GPIO pin conflict (GPIO2 used for both I2C SCL and SDMMC D0?)");
+        ESP_LOGE(TAG, "  3. Wrong GPIO pins configured for your hardware");
+        ESP_LOGE(TAG, "  4. Power supply issue (card needs 3.3V)");
+        ESP_LOGE(TAG, "  5. Card incompatible or damaged");
+        ESP_LOGE(TAG, "  6. Missing pull-up resistors on SDMMC lines");
         ESP_LOGW(TAG, "SD card not available - MP3 files will use SPIFFS");
+        
+        // Try SPI mode as fallback (if hardware supports it)
+        ESP_LOGI(TAG, "Attempting SPI mode fallback...");
+        esp_task_wdt_reset();
+        vTaskDelay(pdMS_TO_TICKS(100));  // Give card time to stabilize
+        
+        // SPI mode configuration (if your hardware supports it)
+        // This requires different GPIO pins: MOSI, MISO, SCLK, CS
+        // Uncomment and configure if your hardware has SPI SD card interface
+        /*
+        sdmmc_host_t spi_host = SDSPI_HOST_DEFAULT();
+        spi_host.slot = SPI2_HOST;
+        
+        spi_bus_config_t bus_cfg = {
+            .mosi_io_num = GPIO_NUM_11,
+            .miso_io_num = GPIO_NUM_13,
+            .sclk_io_num = GPIO_NUM_12,
+            .quadwp_io_num = -1,
+            .quadhd_io_num = -1,
+            .max_transfer_sz = 4000,
+        };
+        ret = spi_bus_initialize(spi_host.slot, &bus_cfg, SPI_DMA_CH_AUTO);
+        if (ret == ESP_OK) {
+            sdspi_device_config_t slot_config_spi = SDSPI_DEVICE_CONFIG_DEFAULT();
+            slot_config_spi.gpio_cs = GPIO_NUM_10;
+            slot_config_spi.host_id = spi_host.slot;
+            
+            ret = esp_vfs_fat_sdspi_mount(mount_point, &spi_host, &slot_config_spi, &mount_config, &card);
+            if (ret == ESP_OK) {
+                sd_card_mounted = true;
+                ESP_LOGI(TAG, "✅ SD card mounted via SPI at %s", mount_point);
+            }
+        }
+        */
     }
     
     if (sd_card_mounted) {
@@ -542,13 +633,20 @@ void app_main(void)
     esp_task_wdt_reset();  // Feed watchdog after LED indicators init
     
     // Initialize action manager and pass the strip handle
-    action_manager_init();
-    action_manager_set_led_strip(s_strip);
-    esp_task_wdt_reset();  // Feed watchdog after action manager init
+    // DISABLED: Temporarily disabled for debugging watchdog resets
+    // action_manager_init();
+    // action_manager_set_led_strip(s_strip);
+    ESP_LOGI(TAG, "Action manager disabled for debugging");
+    esp_task_wdt_reset();  // Feed watchdog after action manager init (disabled)
+    vTaskDelay(pdMS_TO_TICKS(50)); // Yield to allow watchdog feed task to run
     
     // Feed watchdog before audio player init (can take time with I2C operations)
     esp_task_wdt_reset();
-    vTaskDelay(pdMS_TO_TICKS(10));
+    vTaskDelay(pdMS_TO_TICKS(50)); // Yield again before starting long operation
+    
+    ESP_LOGI(TAG, "Starting audio player initialization...");
+    esp_task_wdt_reset();  // Feed watchdog before audio init
+    vTaskDelay(pdMS_TO_TICKS(50));  // Yield before long operation
     
     // Initialize audio player (this does I2C operations which can be slow)
     esp_err_t audio_err = audio_player_init(&s_audio_config);
@@ -726,6 +824,10 @@ void app_main(void)
             ESP_LOGI(TAG, "Wake word detection active - listening for wake words");
         }
     }
+    
+    // Mark initialization as complete - watchdog feed task will now feed less frequently
+    s_init_complete = true;
+    ESP_LOGI(TAG, "✅ Initialization complete - all systems ready");
     
     // Startup animation: brief rainbow sweep
     ESP_LOGI(TAG, "Starting LED animation...");
