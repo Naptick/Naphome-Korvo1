@@ -416,14 +416,9 @@ static void audio_monitor_task(void *pvParameters)
 
 void app_main(void)
 {
-    // Initialize and configure task watchdog timer with longer timeout for initialization
-    esp_task_wdt_config_t wdt_config = {
-        .timeout_ms = 30 * 1000,  // 30 seconds for initialization
-        .idle_core_mask = 0,
-        .trigger_panic = true
-    };
-    esp_task_wdt_init(&wdt_config);
-    esp_task_wdt_add(NULL);  // Add current task to watchdog
+    // Add current task to watchdog (ESP-IDF already initializes it)
+    // Use default timeout - just make sure we're registered
+    esp_task_wdt_add(NULL);
     
     ESP_LOGI(TAG, "Korvo1 LED and Audio Test");
     ESP_LOGI(TAG, "LEDs: %d pixels on GPIO %d (brightness=%d)",
@@ -539,21 +534,26 @@ void app_main(void)
     ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_cfg, &rmt_cfg, &s_strip));
     ESP_ERROR_CHECK(led_strip_clear(s_strip));
     ESP_LOGI(TAG, "LED strip initialized");
+    esp_task_wdt_reset();  // Feed watchdog after LED strip init
     
     // Initialize LED indicators and pass the strip handle
     led_indicators_init();
     led_indicators_set_strip(s_strip);
+    esp_task_wdt_reset();  // Feed watchdog after LED indicators init
     
     // Initialize action manager and pass the strip handle
     action_manager_init();
     action_manager_set_led_strip(s_strip);
+    esp_task_wdt_reset();  // Feed watchdog after action manager init
     
-    // Feed watchdog before audio player init (can take time)
+    // Feed watchdog before audio player init (can take time with I2C operations)
     esp_task_wdt_reset();
     vTaskDelay(pdMS_TO_TICKS(10));
     
-    // Initialize audio player
+    // Initialize audio player (this does I2C operations which can be slow)
     esp_err_t audio_err = audio_player_init(&s_audio_config);
+    // Feed watchdog after audio player init
+    esp_task_wdt_reset();
     if (audio_err != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize audio player: %s", esp_err_to_name(audio_err));
         // Continue anyway - LEDs will still work
@@ -561,8 +561,12 @@ void app_main(void)
         ESP_LOGI(TAG, "Audio player initialized");
     }
     
+    // Feed watchdog before WiFi initialization
+    esp_task_wdt_reset();
+    
     // Initialize BLE for WiFi onboarding (before WiFi connection)
 #ifdef CONFIG_BT_ENABLED
+    esp_task_wdt_reset();  // Feed watchdog before BLE init
     somnus_ble_config_t ble_cfg = {
         .connect_cb = ble_wifi_connect_cb,
         .connect_ctx = NULL,
@@ -577,11 +581,13 @@ void app_main(void)
         ESP_LOGI(TAG, "✅ BLE service started - ready for WiFi onboarding");
         ESP_LOGI(TAG, "   Mobile app can scan WiFi and connect via BLE");
     }
+    esp_task_wdt_reset();  // Feed watchdog after BLE init
 #else
     ESP_LOGI(TAG, "BLE disabled in build configuration - skipping BLE initialization");
 #endif
     
     // Initialize WiFi (required for Gemini API)
+    esp_task_wdt_reset();  // Feed watchdog before WiFi init
     wifi_manager_init();
     
     // Configure WiFi from menuconfig
@@ -624,11 +630,13 @@ void app_main(void)
                     mdns_service_add(NULL, "_http", "_tcp", 80, NULL, 0);
                     ESP_LOGI(TAG, "✅ mDNS service advertised");
                 }
+                esp_task_wdt_reset();  // Feed watchdog after mDNS init
                 
                 // Start webserver after WiFi is connected
                 webserver_config_t ws_cfg = {
                     .port = 80
                 };
+                esp_task_wdt_reset();  // Feed watchdog before webserver start
                 esp_err_t ws_err = webserver_start(&s_webserver, &ws_cfg);
                 if (ws_err != ESP_OK) {
                     ESP_LOGW(TAG, "Failed to start webserver: %s", esp_err_to_name(ws_err));
@@ -637,6 +645,7 @@ void app_main(void)
                 }
                 
                 // Initialize and start sensor integration (publishes to naptick API)
+                esp_task_wdt_reset();  // Feed watchdog before sensor init
                 esp_err_t sensor_err = sensor_integration_init();
                 if (sensor_err != ESP_OK) {
                     ESP_LOGW(TAG, "Failed to initialize sensor integration: %s", esp_err_to_name(sensor_err));
@@ -648,6 +657,7 @@ void app_main(void)
                         ESP_LOGI(TAG, "✅ Sensor integration started - publishing to naptick API");
                     }
                 }
+                esp_task_wdt_reset();  // Feed watchdog after sensor init
             }
         }
     } else {
@@ -659,6 +669,7 @@ void app_main(void)
     // Initialize voice assistant (Gemini STT-LLM-TTS)
     #ifdef CONFIG_GEMINI_API_KEY
     if (strlen(CONFIG_GEMINI_API_KEY) > 0) {
+        esp_task_wdt_reset();  // Feed watchdog before voice assistant init
         voice_assistant_config_t va_config = {
             .gemini_api_key = CONFIG_GEMINI_API_KEY,
             .gemini_model = CONFIG_GEMINI_MODEL
@@ -670,6 +681,7 @@ void app_main(void)
             ESP_LOGE(TAG, "Failed to initialize voice assistant: %s", esp_err_to_name(va_err));
         } else {
             ESP_LOGI(TAG, "✅ Voice assistant initialized (model: %s)", CONFIG_GEMINI_MODEL);
+            esp_task_wdt_reset();  // Feed watchdog before voice assistant start
             va_err = voice_assistant_start();
             if (va_err != ESP_OK) {
                 ESP_LOGE(TAG, "Failed to start voice assistant: %s", esp_err_to_name(va_err));
@@ -677,6 +689,7 @@ void app_main(void)
                 ESP_LOGI(TAG, "✅ Voice assistant started - ready for wake word commands");
             }
         }
+        esp_task_wdt_reset();  // Feed watchdog after voice assistant init
     } else {
         ESP_LOGW(TAG, "⚠️  Gemini API key not configured - voice assistant disabled");
         ESP_LOGW(TAG, "Set CONFIG_GEMINI_API_KEY in menuconfig or sdkconfig.defaults");
@@ -686,6 +699,7 @@ void app_main(void)
     #endif
     
     // Initialize audio file manager (for MP3 playback)
+    esp_task_wdt_reset();  // Feed watchdog before audio file manager init
     esp_err_t afm_err = audio_file_manager_init();
     if (afm_err != ESP_OK) {
         ESP_LOGW(TAG, "Failed to initialize audio file manager: %s", esp_err_to_name(afm_err));
@@ -693,9 +707,11 @@ void app_main(void)
         size_t track_count = audio_file_manager_get_count();
         ESP_LOGI(TAG, "✅ Audio file manager initialized with %zu tracks", track_count);
     }
+    esp_task_wdt_reset();  // Feed watchdog after audio file manager init
     
     // Initialize wake word detection
     // Korvo1 uses I2S1 for microphone (ES7210 ADC) - separate from I2S0 (speaker/ES8311)
+    esp_task_wdt_reset();  // Feed watchdog before wake word manager init
     esp_err_t wake_err = wake_word_manager_init();
     if (wake_err != ESP_OK) {
         ESP_LOGW(TAG, "Failed to initialize wake word manager: %s", esp_err_to_name(wake_err));

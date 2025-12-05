@@ -11,6 +11,7 @@
 #define i2c_master_dev_handle_t i2c_cmd_handle_t
 #include "esp_check.h"
 #include "esp_log.h"
+#include "esp_task_wdt.h"
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
 #include "driver/i2s_std.h"
 #else
@@ -229,9 +230,13 @@ static esp_err_t es8311_config_clock_44100(void)
 
 static esp_err_t es8311_init(void)
 {
+    // Feed watchdog at start
+    esp_task_wdt_reset();
+    
     // Probe device first
     ESP_LOGI(TAG, "Probing ES8311 at I2C address 0x%02x (7-bit)...", ES8311_ADDR_7BIT);
     esp_err_t probe_err = es8311_probe();
+    esp_task_wdt_reset(); // Feed watchdog after probe
     if (probe_err != ESP_OK) {
         ESP_LOGW(TAG, "ES8311 probe failed, continuing anyway...");
     }
@@ -242,6 +247,7 @@ static esp_err_t es8311_init(void)
     // Initial setup (from es8311_open)
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_GPIO_REG44, 0x08), TAG, "gpio 44"); // Enhance I2C noise immunity
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_GPIO_REG44, 0x08), TAG, "gpio 44"); // Second write for reliability
+    esp_task_wdt_reset(); // Feed watchdog after first few writes
     
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_CLK_MANAGER_REG01, 0x30), TAG, "clk mgr 1 init");
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_CLK_MANAGER_REG02, 0x00), TAG, "clk mgr 2 init");
@@ -249,15 +255,20 @@ static esp_err_t es8311_init(void)
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_ADC_REG16, 0x24), TAG, "adc 16 init");
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_CLK_MANAGER_REG04, 0x10), TAG, "clk mgr 4 init");
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_CLK_MANAGER_REG05, 0x00), TAG, "clk mgr 5 init");
+    esp_task_wdt_reset(); // Feed watchdog after clock manager writes
+    
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_SYSTEM_REG0B, 0x00), TAG, "sys 0B init");
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_SYSTEM_REG0C, 0x00), TAG, "sys 0C init");
     // SYSTEM_REG10: HPOUT control - disable headphone output
     // Bit 7 typically enables/disables HPOUT, lower bits are volume
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_SYSTEM_REG10, 0x00), TAG, "sys 10 init"); // Disable HPOUT (bit 7=0)
+    esp_task_wdt_reset(); // Feed watchdog after system register writes
     
     // Reset FIRST (this will clear all registers, so we'll set REG11 after reset)
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_RESET_REG00, 0x80), TAG, "reset"); // Reset, slave mode
+    esp_task_wdt_reset(); // Feed watchdog before delay
     vTaskDelay(pdMS_TO_TICKS(20)); // Delay after reset to allow registers to stabilize
+    esp_task_wdt_reset(); // Feed watchdog after delay
     
     // Clock manager: Don't use external MCLK (use_mclk=false), generate from BCLK, no invert, slave mode
     // When use_mclk=false, bit 7 should be set (0xBF = 0x3F | 0x80)
@@ -265,6 +276,7 @@ static esp_err_t es8311_init(void)
     
     // Configure clock for 48000 Hz (matching the embedded WAV file)
     ESP_RETURN_ON_ERROR(es8311_config_clock_48000(), TAG, "clock config");
+    esp_task_wdt_reset(); // Feed watchdog after clock config
     ESP_LOGI(TAG, "ES8311 clock configured for 48000 Hz");
     
     // I2S interface configuration - I2S format, 16-bit
@@ -272,6 +284,7 @@ static esp_err_t es8311_init(void)
     uint8_t dac_iface, adc_iface;
     ESP_RETURN_ON_ERROR(es8311_read_reg(ES8311_SDPIN_REG09, &dac_iface), TAG, "read sdp in");
     ESP_RETURN_ON_ERROR(es8311_read_reg(ES8311_SDPOUT_REG0A, &adc_iface), TAG, "read sdp out");
+    esp_task_wdt_reset(); // Feed watchdog after register reads
     dac_iface &= 0xBF;  // Clear bit 6 first
     adc_iface &= 0xBF;  // Clear bit 6 first
     // For DAC mode, clear bit 6 again (equivalent to &= ~(BITS(6)))
@@ -281,6 +294,7 @@ static esp_err_t es8311_init(void)
     adc_iface |= 0x0C;  // I2S format, 16-bit
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_SDPIN_REG09, dac_iface), TAG, "sdp in"); // DAC I2S, 16-bit, enabled
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_SDPOUT_REG0A, adc_iface), TAG, "sdp out"); // ADC I2S, 16-bit
+    esp_task_wdt_reset(); // Feed watchdog after I2S config writes
     
     // System configuration (from es8311_start)
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_ADC_REG17, 0xBF), TAG, "adc 17");
@@ -288,41 +302,53 @@ static esp_err_t es8311_init(void)
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_SYSTEM_REG12, 0x00), TAG, "sys 12"); // Enable DAC (0x00 = enable)
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_SYSTEM_REG14, 0x1A), TAG, "sys 14"); // Analog PGA gain
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_SYSTEM_REG0D, 0x01), TAG, "sys 0D"); // Power up
+    esp_task_wdt_reset(); // Feed watchdog before delay
     vTaskDelay(pdMS_TO_TICKS(20)); // Delay after power up to allow codec to stabilize
+    esp_task_wdt_reset(); // Feed watchdog after delay
     
     // SYSTEM_REG0F: Output path selection - MUST be set BEFORE REG11
     // According to ES8311 datasheet, REG0F controls output path:
     // Bit 0-1: HPOUT control, Bit 2-3: SPKOUT control
     // Use 0x0C to enable SPKOUT only (disable HPOUT to avoid routing issues)
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_SYSTEM_REG0F, 0x00), TAG, "sys 0F disable all"); // Disable all first
+    esp_task_wdt_reset(); // Feed watchdog before delay
     vTaskDelay(pdMS_TO_TICKS(10)); // Small delay
+    esp_task_wdt_reset(); // Feed watchdog after delay
     
     // Enable SPKOUT only (0x0C = bits 2-3 set for SPKOUT)
     uint8_t reg0f_value = 0x0C;  // Enable SPKOUT, disable HPOUT
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_SYSTEM_REG0F, reg0f_value), TAG, "sys 0F enable SPKOUT");
+    esp_task_wdt_reset(); // Feed watchdog before delay
     vTaskDelay(pdMS_TO_TICKS(10)); // Delay after REG0F
+    esp_task_wdt_reset(); // Feed watchdog after delay
     // Read back to verify
     uint8_t reg0f_readback = 0;
     if (es8311_read_reg(ES8311_SYSTEM_REG0F, &reg0f_readback) == ESP_OK) {
         ESP_LOGI(TAG, "REG0F written=0x%02x, readback=0x%02x", reg0f_value, reg0f_readback);
     }
+    esp_task_wdt_reset(); // Feed watchdog after read
     
     // SYSTEM_REG11: SPKOUT control - enable speaker output
     // Bit 7 typically enables SPKOUT (1=enable), lower bits are volume
     // Write REG11 AFTER REG0F to ensure path is enabled first
     // Try 0x80 first (just enable bit), then set volume
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_SYSTEM_REG11, 0x80), TAG, "sys 11 enable SPKOUT bit"); // Enable SPKOUT (bit 7=1), min volume
+    esp_task_wdt_reset(); // Feed watchdog before delay
     vTaskDelay(pdMS_TO_TICKS(10)); // Delay after setting enable bit
+    esp_task_wdt_reset(); // Feed watchdog after delay
     
     // Now set volume: 0xFF = max, 0xE0 = ~88% volume, 0xD0 = ~81% volume
     // Using 0xE0 for good volume without distortion
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_SYSTEM_REG11, 0xE0), TAG, "sys 11 set SPKOUT volume"); // Enable SPKOUT (bit 7=1) + volume
+    esp_task_wdt_reset(); // Feed watchdog before delay
     vTaskDelay(pdMS_TO_TICKS(10)); // Delay after setting volume
+    esp_task_wdt_reset(); // Feed watchdog after delay
     // Read back to verify and retry if bit 7 is not set
     uint8_t reg11_readback = 0;
     int retry_count = 0;
     const int max_retries = 5;
     while (retry_count < max_retries) {
+        esp_task_wdt_reset(); // Feed watchdog in retry loop
         if (es8311_read_reg(ES8311_SYSTEM_REG11, &reg11_readback) == ESP_OK) {
             ESP_LOGI(TAG, "REG11 readback attempt %d: 0x%02x", retry_count + 1, reg11_readback);
             if ((reg11_readback & 0x80) != 0) {
@@ -337,16 +363,21 @@ static esp_err_t es8311_init(void)
         
         // Write 0xFF (max volume, ensure enable bit is set)
         es8311_write_reg(ES8311_SYSTEM_REG11, 0xFF);
+        esp_task_wdt_reset(); // Feed watchdog before delay
         vTaskDelay(pdMS_TO_TICKS(20));
+        esp_task_wdt_reset(); // Feed watchdog after delay
         
         // Verify it was written
         uint8_t verify = 0;
         if (es8311_read_reg(ES8311_SYSTEM_REG11, &verify) == ESP_OK) {
             ESP_LOGI(TAG, "REG11 after writing 0xFF: 0x%02x", verify);
+            esp_task_wdt_reset(); // Feed watchdog after read
             if ((verify & 0x80) != 0) {
                 // Success! Now set to desired volume but keep enable bit
                 es8311_write_reg(ES8311_SYSTEM_REG11, 0xE0);
+                esp_task_wdt_reset(); // Feed watchdog before delay
                 vTaskDelay(pdMS_TO_TICKS(10));
+                esp_task_wdt_reset(); // Feed watchdog after delay
                 if (es8311_read_reg(ES8311_SYSTEM_REG11, &reg11_readback) == ESP_OK) {
                     if ((reg11_readback & 0x80) != 0) {
                         ESP_LOGI(TAG, "✅ REG11 successfully set to 0x%02x (SPKOUT enabled)", reg11_readback);
@@ -562,10 +593,17 @@ esp_err_t audio_player_init(const audio_player_config_t *cfg)
     s_audio.cfg = *cfg;
     s_audio.current_sample_rate = cfg->default_sample_rate > 0 ? cfg->default_sample_rate : 44100;
 
+    // Feed watchdog before I2C setup
+    esp_task_wdt_reset();
     ESP_RETURN_ON_ERROR(configure_i2c(cfg), TAG, "i2c setup");
     vTaskDelay(pdMS_TO_TICKS(50)); // Give I2C bus more time to stabilize
+    esp_task_wdt_reset(); // Feed watchdog after delay
+    
     ESP_RETURN_ON_ERROR(configure_i2s(cfg), TAG, "i2s setup");
+    esp_task_wdt_reset(); // Feed watchdog after I2S setup
+    
     ESP_RETURN_ON_ERROR(es8311_init(), TAG, "codec init");
+    esp_task_wdt_reset(); // Feed watchdog after codec init
 
     // Initialize EQ for both channels (enabled by default)
     // EQ will be re-initialized with actual sample rate when playback starts
