@@ -306,14 +306,14 @@ static esp_err_t es8311_init(void)
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_SYSTEM_REG11, 0x80), TAG, "sys 11 enable SPKOUT bit"); // Enable SPKOUT (bit 7=1), min volume
     vTaskDelay(pdMS_TO_TICKS(10)); // Delay after setting enable bit
     
-    // Now set volume: 0xFF = max, 0xC0 = ~75% volume
-    // Using 0xC0 for good volume without distortion
-    ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_SYSTEM_REG11, 0xC0), TAG, "sys 11 set SPKOUT volume"); // Enable SPKOUT (bit 7=1) + volume
+    // Now set volume: 0xFF = max, 0xE0 = ~88% volume, 0xD0 = ~81% volume
+    // Using 0xE0 for good volume without distortion
+    ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_SYSTEM_REG11, 0xE0), TAG, "sys 11 set SPKOUT volume"); // Enable SPKOUT (bit 7=1) + volume
     vTaskDelay(pdMS_TO_TICKS(10)); // Delay after setting volume
     // Read back to verify
     uint8_t reg11_readback = 0;
     if (es8311_read_reg(ES8311_SYSTEM_REG11, &reg11_readback) == ESP_OK) {
-        ESP_LOGI(TAG, "REG11 written=0x%02x, readback=0x%02x", 0xC0, reg11_readback);
+        ESP_LOGI(TAG, "REG11 written=0x%02x, readback=0x%02x", 0xE0, reg11_readback);
         if ((reg11_readback & 0x80) == 0) {
             ESP_LOGW(TAG, "WARNING: REG11 bit 7 is 0 (SPKOUT may be disabled)!");
         }
@@ -324,9 +324,9 @@ static esp_err_t es8311_init(void)
     
     // DAC configuration
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_DAC_REG31, 0x00), TAG, "dac 31"); // Unmute
-    // Volume: 0xFF = max, 0xC0 = ~0dB, 0xB0 = ~-3dB, 0xA0 = ~-6dB
-    // Using 0xB0 for -3dB headroom to prevent distortion
-    ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_DAC_REG32, 0xB0), TAG, "dac 32"); // -3dB volume for headroom
+    // Volume: 0xFF = max, 0xE0 = ~-1dB, 0xD0 = ~-2dB, 0xC0 = ~0dB, 0xB0 = ~-3dB
+    // Using 0xD0 for good volume without distortion
+    ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_DAC_REG32, 0xD0), TAG, "dac 32"); // Good volume level
     
     // Additional registers from es8311_open
     // SYSTEM_REG13: May control output routing or bias
@@ -361,10 +361,10 @@ static esp_err_t es8311_init(void)
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_SYSTEM_REG0F, 0x0C), TAG, "sys 0F re-enable SPKOUT"); // Enable SPKOUT only
     vTaskDelay(pdMS_TO_TICKS(10));
     
-    // Write REG11 with 0xFF (max) to ensure bit 7 is definitely set, then reduce to 0xC0
+    // Write REG11 with 0xFF (max) to ensure bit 7 is definitely set, then set to desired volume
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_SYSTEM_REG11, 0xFF), TAG, "sys 11 max SPKOUT"); // Max volume to ensure enable
     vTaskDelay(pdMS_TO_TICKS(10));
-    ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_SYSTEM_REG11, 0xC0), TAG, "sys 11 final SPKOUT"); // Set to desired volume
+    ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_SYSTEM_REG11, 0xE0), TAG, "sys 11 final SPKOUT"); // Set to good volume level
     vTaskDelay(pdMS_TO_TICKS(10));
     
     ESP_RETURN_ON_ERROR(es8311_write_reg(ES8311_DAC_REG31, 0x00), TAG, "dac 31 unmute"); // Ensure unmuted

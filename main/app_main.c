@@ -442,11 +442,7 @@ void app_main(void)
     #endif
     
     // Initialize wake word detection
-    // NOTE: PDM mode only works on I2S0, but I2S0 is used for speaker output
-    // Wake word detection is temporarily disabled until we can resolve the I2S port conflict
-    // TODO: Investigate sharing I2S0 or using alternative microphone input method
-    ESP_LOGW(TAG, "Wake word detection temporarily disabled - I2S PDM requires I2S0 (used by speaker)");
-    /*
+    // Korvo1 uses I2S1 for microphone (ES7210 ADC) - separate from I2S0 (speaker/ES8311)
     esp_err_t wake_err = wake_word_manager_init();
     if (wake_err != ESP_OK) {
         ESP_LOGW(TAG, "Failed to initialize wake word manager: %s", esp_err_to_name(wake_err));
@@ -461,7 +457,6 @@ void app_main(void)
             ESP_LOGI(TAG, "Wake word detection active - listening for wake words");
         }
     }
-    */
     
     // Startup animation: brief rainbow sweep
     ESP_LOGI(TAG, "Starting LED animation...");
@@ -526,22 +521,21 @@ void app_main(void)
     vTaskDelay(pdMS_TO_TICKS(1000));
     
     // Play log sweep once as startup indicator
-    ESP_LOGI(TAG, "=== Playing log sweep test tone ===");
-
-    if (audio_err == ESP_OK) {
-        play_log_sweep_pcm();
-    } else {
-        ESP_LOGW(TAG, "Skipping audio (audio player not initialized)");
-        // Just animate LEDs
-        for (int i = 0; i < 100; i++) {
-            float progress = (float)i / 100.0f;
-            update_leds_for_audio(progress, true);
-            vTaskDelay(pdMS_TO_TICKS(50));
-        }
-        update_leds_for_audio(0.0f, false);
-    }
-    
-    ESP_LOGI(TAG, "=== Sweep playback complete - entering voice assistant mode ===");
+    // DISABLED: Skip automatic sweep playback
+    // ESP_LOGI(TAG, "=== Playing log sweep test tone ===");
+    // if (audio_err == ESP_OK) {
+    //     play_log_sweep_pcm();
+    // } else {
+    //     ESP_LOGW(TAG, "Skipping audio (audio player not initialized)");
+    //     // Just animate LEDs
+    //     for (int i = 0; i < 100; i++) {
+    //         float progress = (float)i / 100.0f;
+    //         update_leds_for_audio(progress, true);
+    //         vTaskDelay(pdMS_TO_TICKS(50));
+    //     }
+    //     update_leds_for_audio(0.0f, false);
+    // }
+    ESP_LOGI(TAG, "=== Entering voice assistant mode ===");
     vTaskDelay(pdMS_TO_TICKS(1000));
 
     // Test TTS with welcome message (graceful fallback if offline/no WiFi)

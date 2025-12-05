@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <inttypes.h>
 #include <ctype.h>
+#include <math.h>
 
 static const char *TAG = "gemini_api";
 
@@ -45,10 +46,12 @@ static esp_err_t http_event_handler(esp_http_client_event_t *evt)
             if (evt->data_len == 0) {
                 break;
             }
-            // Check if buffer would overflow
-            if (buf->len + evt->data_len > buf->cap) {
+            // Check if buffer would overflow (leave 1 byte for null terminator)
+            if (buf->len + evt->data_len >= buf->cap) {
                 // Don't log in interrupt handler - it blocks the main task from watchdog
                 // Pre-allocated buffer should be sufficient for Gemini API responses
+                ESP_LOGW(TAG, "Response buffer overflow: len=%zu, adding=%zu, cap=%zu", 
+                         buf->len, evt->data_len, buf->cap);
                 return ESP_ERR_NO_MEM;
             }
             // Copy data to buffer (safe, no realloc needed)
@@ -276,6 +279,26 @@ esp_err_t gemini_stt(const int16_t *audio_data, size_t audio_len, char *text_out
     ESP_LOGI(TAG, "🔊 [Gemini STT] Starting transcription: %zu samples @ 16000 Hz (%.2f sec)", 
              audio_len, duration_sec);
     
+    // Validate audio - check if it's all zeros (silence)
+    int32_t sum = 0;
+    int32_t sum_sq = 0;
+    int16_t max_val = 0;
+    int16_t min_val = 0;
+    for (size_t i = 0; i < audio_len; i++) {
+        int16_t sample = audio_data[i];
+        sum += sample;
+        sum_sq += (int32_t)sample * sample;
+        if (sample > max_val) max_val = sample;
+        if (sample < min_val) min_val = sample;
+    }
+    float rms = sqrtf((float)sum_sq / audio_len);
+    float avg = (float)sum / audio_len;
+    ESP_LOGI(TAG, "Audio stats: RMS=%.1f, avg=%.1f, peak=[%d, %d]", rms, avg, min_val, max_val);
+    
+    if (rms < 10.0f) {
+        ESP_LOGW(TAG, "⚠️  Audio appears to be silence (RMS=%.1f < 10), STT may fail", rms);
+    }
+    
     // Build WAV file from PCM
     uint8_t *wav = NULL;
     size_t wav_len = 0;
@@ -327,13 +350,17 @@ esp_err_t gemini_stt(const int16_t *audio_data, size_t audio_len, char *text_out
     free(payload);
     
     if (ret != ESP_OK) {
-        if (response.data) free(response.data);
+        ESP_LOGE(TAG, "HTTP request failed: %s", esp_err_to_name(ret));
+        if (response.data) {
+            ESP_LOGE(TAG, "Response data (first 200 chars): %.200s", (const char *)response.data);
+            free(response.data);
+        }
         return ret;
     }
     
     // Parse response
     if (!response.data || response.len == 0) {
-        ESP_LOGE(TAG, "Empty response");
+        ESP_LOGE(TAG, "Empty response from STT API");
         if (response.data) free(response.data);
         return ESP_FAIL;
     }
@@ -341,39 +368,104 @@ esp_err_t gemini_stt(const int16_t *audio_data, size_t audio_len, char *text_out
     response.data = realloc(response.data, response.len + 1);
     response.data[response.len] = '\0';
     
-    cJSON *response_json = cJSON_Parse((char *)response.data);
-    free(response.data);
+    ESP_LOGD(TAG, "STT API response (len=%zu, first 500 chars): %.500s", response.len, (const char *)response.data);
     
+    cJSON *response_json = cJSON_Parse((char *)response.data);
     if (!response_json) {
-        ESP_LOGE(TAG, "Failed to parse JSON response");
+        ESP_LOGE(TAG, "Failed to parse JSON response (len=%zu, first 200 chars: %.200s)", 
+                 response.len, (const char *)response.data);
+        free(response.data);
+        return ESP_FAIL;
+    }
+    
+    // Check for error in response
+    cJSON *error = cJSON_GetObjectItem(response_json, "error");
+    if (error) {
+        cJSON *error_message = cJSON_GetObjectItem(error, "message");
+        cJSON *error_code = cJSON_GetObjectItem(error, "code");
+        ESP_LOGE(TAG, "STT API error: code=%d, message=%s", 
+                 error_code ? error_code->valueint : -1,
+                 error_message ? error_message->valuestring : "unknown");
+        cJSON_Delete(response_json);
+        free(response.data);
         return ESP_FAIL;
     }
     
     // Extract transcript
     cJSON *results = cJSON_GetObjectItem(response_json, "results");
-    if (results && cJSON_IsArray(results) && cJSON_GetArraySize(results) > 0) {
-        cJSON *result = cJSON_GetArrayItem(results, 0);
-        if (result) {
-            cJSON *alternatives = cJSON_GetObjectItem(result, "alternatives");
-            if (alternatives && cJSON_IsArray(alternatives) && cJSON_GetArraySize(alternatives) > 0) {
-                cJSON *alt = cJSON_GetArrayItem(alternatives, 0);
-                if (alt) {
-                    cJSON *transcript = cJSON_GetObjectItem(alt, "transcript");
-                    if (transcript && cJSON_IsString(transcript)) {
-                        strncpy(text_out, transcript->valuestring, text_len - 1);
-                        text_out[text_len - 1] = '\0';
-                        cJSON_Delete(response_json);
-                        ESP_LOGI(TAG, "✅ [Gemini STT] Success: \"%s\"", text_out);
-                        return ESP_OK;
-                    }
-                }
-            }
-        }
+    if (!results) {
+        ESP_LOGE(TAG, "No 'results' field in STT response");
+        cJSON_Delete(response_json);
+        free(response.data);
+        return ESP_FAIL;
     }
     
+    if (!cJSON_IsArray(results)) {
+        ESP_LOGE(TAG, "'results' is not an array");
+        cJSON_Delete(response_json);
+        free(response.data);
+        return ESP_FAIL;
+    }
+    
+    int results_size = cJSON_GetArraySize(results);
+    ESP_LOGI(TAG, "STT response contains %d result(s)", results_size);
+    
+    if (results_size == 0) {
+        ESP_LOGW(TAG, "⚠️  STT returned no results - audio may be silence or unrecognized");
+        cJSON_Delete(response_json);
+        free(response.data);
+        // Return empty string instead of failure - this is a valid case (silence)
+        text_out[0] = '\0';
+        return ESP_OK;
+    }
+    
+    cJSON *result = cJSON_GetArrayItem(results, 0);
+    if (!result) {
+        ESP_LOGE(TAG, "Failed to get first result");
+        cJSON_Delete(response_json);
+        free(response.data);
+        return ESP_FAIL;
+    }
+    
+    cJSON *alternatives = cJSON_GetObjectItem(result, "alternatives");
+    if (!alternatives || !cJSON_IsArray(alternatives)) {
+        ESP_LOGE(TAG, "No 'alternatives' array in result");
+        cJSON_Delete(response_json);
+        free(response.data);
+        return ESP_FAIL;
+    }
+    
+    int alt_size = cJSON_GetArraySize(alternatives);
+    if (alt_size == 0) {
+        ESP_LOGW(TAG, "No alternatives in result");
+        cJSON_Delete(response_json);
+        free(response.data);
+        text_out[0] = '\0';
+        return ESP_OK;
+    }
+    
+    cJSON *alt = cJSON_GetArrayItem(alternatives, 0);
+    if (!alt) {
+        ESP_LOGE(TAG, "Failed to get first alternative");
+        cJSON_Delete(response_json);
+        free(response.data);
+        return ESP_FAIL;
+    }
+    
+    cJSON *transcript = cJSON_GetObjectItem(alt, "transcript");
+    if (!transcript || !cJSON_IsString(transcript)) {
+        ESP_LOGE(TAG, "No 'transcript' string in alternative");
+        cJSON_Delete(response_json);
+        free(response.data);
+        return ESP_FAIL;
+    }
+    
+    strncpy(text_out, transcript->valuestring, text_len - 1);
+    text_out[text_len - 1] = '\0';
     cJSON_Delete(response_json);
-    ESP_LOGE(TAG, "❌ [Gemini STT] Failed to extract transcript from response");
-    return ESP_FAIL;
+    free(response.data);
+    ESP_LOGI(TAG, "✅ [Gemini STT] Success: \"%s\"", text_out);
+    return ESP_OK;
 }
 
 esp_err_t gemini_llm(const char *prompt, char *response, size_t response_len)
@@ -628,7 +720,8 @@ esp_err_t gemini_tts_streaming(const char *text, gemini_tts_playback_callback_t 
 
     // Allocate large PSRAM buffer for entire JSON response
     // TTS responses are typically 50-200KB JSON with base64-encoded audio
-    const size_t JSON_BUFFER_SIZE = 512 * 1024;  // 512KB in PSRAM
+    // Leave 1 byte for null terminator
+    const size_t JSON_BUFFER_SIZE = 256 * 1024;  // 256KB in PSRAM (sufficient for most TTS responses)
     http_buffer_t response = {0};
     response.data = heap_caps_malloc(JSON_BUFFER_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!response.data) {
@@ -640,9 +733,10 @@ esp_err_t gemini_tts_streaming(const char *text, gemini_tts_playback_callback_t 
             return ESP_ERR_NO_MEM;
         }
     }
-    response.cap = JSON_BUFFER_SIZE;
+    response.cap = JSON_BUFFER_SIZE - 1;  // Reserve 1 byte for null terminator
     response.len = 0;
-    ESP_LOGI(TAG, "Allocated %zu byte PSRAM buffer for TTS response", JSON_BUFFER_SIZE);
+    ESP_LOGI(TAG, "Allocated %zu byte PSRAM buffer for TTS response (cap=%zu)", 
+             JSON_BUFFER_SIZE, response.cap);
 
     // Perform HTTP request - store entire response
     esp_err_t err = http_post_json_with_auth(url, payload, NULL, &response);
@@ -654,25 +748,121 @@ esp_err_t gemini_tts_streaming(const char *text, gemini_tts_playback_callback_t 
         return err;
     }
 
-    // Parse JSON response to extract base64 audio content
-    cJSON *json_root = cJSON_ParseWithLength((const char *)response.data, response.len);
+    // Ensure response is null-terminated for JSON parsing
+    if (response.len >= response.cap) {
+        ESP_LOGE(TAG, "Response buffer full (%zu >= %zu), may be truncated", response.len, response.cap);
+        free(response.data);
+        return ESP_ERR_NO_MEM;
+    }
+    
+    // Null-terminate the response for safe JSON parsing
+    response.data[response.len] = '\0';
+    
+    // Debug: Check for potential issues in response
+    ESP_LOGD(TAG, "TTS response: len=%zu, cap=%zu, last 50 chars: %.50s", 
+             response.len, response.cap, (const char *)(response.data + (response.len > 50 ? response.len - 50 : 0)));
+    
+    // Validate response doesn't contain embedded nulls (which would break JSON parsing)
+    bool has_null = false;
+    for (size_t i = 0; i < response.len; i++) {
+        if (response.data[i] == '\0') {
+            has_null = true;
+            ESP_LOGW(TAG, "Response contains null byte at offset %zu", i);
+            break;
+        }
+    }
+    if (has_null) {
+        ESP_LOGE(TAG, "Response contains embedded null bytes - cannot parse as JSON");
+        free(response.data);
+        return ESP_FAIL;
+    }
+    
+    // Try to parse JSON - if it fails due to long base64 string, extract manually
+    cJSON *json_root = cJSON_Parse((const char *)response.data);
+    const char *base64_audio = NULL;
+    size_t base64_len = 0;
+    
     if (!json_root) {
-        ESP_LOGE(TAG, "Failed to parse JSON response");
-        free(response.data);
-        return ESP_FAIL;
-    }
-
-    cJSON *audio_content = cJSON_GetObjectItem(json_root, "audioContent");
-    if (!audio_content || !cJSON_IsString(audio_content)) {
-        ESP_LOGE(TAG, "Missing or invalid audioContent in response");
+        // JSON parsing failed - try manual extraction as fallback
+        ESP_LOGW(TAG, "cJSON parse failed, trying manual extraction");
+        const char *audio_content_start = strstr((const char *)response.data, "\"audioContent\"");
+        if (audio_content_start) {
+            // Find the colon after "audioContent"
+            const char *colon = strchr(audio_content_start, ':');
+            if (colon) {
+                // Skip whitespace after colon
+                const char *value_start = colon + 1;
+                while (*value_start == ' ' || *value_start == '\t') {
+                    value_start++;
+                }
+                // Find opening quote
+                if (*value_start == '"') {
+                    base64_audio = value_start + 1; // Start after opening quote
+                    // Find closing quote - search forward from start, not backward from end
+                    const char *quote_end = strchr(base64_audio, '"');
+                    if (quote_end && quote_end > base64_audio) {
+                        base64_len = quote_end - base64_audio;
+                        ESP_LOGI(TAG, "Manually extracted base64: %zu chars", base64_len);
+                    } else {
+                        ESP_LOGE(TAG, "Could not find closing quote for audioContent");
+                    }
+                } else {
+                    ESP_LOGE(TAG, "audioContent value does not start with quote");
+                }
+            }
+        }
+        
+        if (!base64_audio || base64_len == 0) {
+            const char *error_ptr = cJSON_GetErrorPtr();
+            if (error_ptr != NULL) {
+                size_t error_offset = error_ptr - (const char *)response.data;
+                ESP_LOGE(TAG, "JSON parse error at offset %zu: %s", error_offset, error_ptr);
+                size_t context_start = (error_offset > 100) ? error_offset - 100 : 0;
+                ESP_LOGE(TAG, "Context around error (offset %zu): %.200s", error_offset, (const char *)(response.data + context_start));
+            }
+            ESP_LOGE(TAG, "Failed to parse JSON and manual extraction failed (len=%zu, first 200 chars: %.200s)", 
+                     response.len, (const char *)response.data);
+            free(response.data);
+            return ESP_FAIL;
+        }
+    } else {
+        // JSON parsed successfully - use cJSON to extract
+        cJSON *audio_content = cJSON_GetObjectItem(json_root, "audioContent");
+        if (!audio_content || !cJSON_IsString(audio_content)) {
+            ESP_LOGE(TAG, "Missing or invalid audioContent in response");
+            cJSON_Delete(json_root);
+            free(response.data);
+            return ESP_FAIL;
+        }
+        base64_audio = audio_content->valuestring;
+        base64_len = strlen(base64_audio);
         cJSON_Delete(json_root);
+    }
+    ESP_LOGI(TAG, "Extracted base64 audio: %zu characters", base64_len);
+    
+    // Validate base64 string
+    if (base64_len == 0) {
+        ESP_LOGE(TAG, "Base64 string is empty");
         free(response.data);
         return ESP_FAIL;
     }
-
-    const char *base64_audio = audio_content->valuestring;
-    size_t base64_len = strlen(base64_audio);
-    ESP_LOGI(TAG, "Extracted base64 audio: %zu characters", base64_len);
+    
+    // Check first few characters are valid base64
+    bool valid_base64 = true;
+    for (size_t i = 0; i < (base64_len < 10 ? base64_len : 10); i++) {
+        char c = base64_audio[i];
+        if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || 
+              (c >= '0' && c <= '9') || c == '+' || c == '/' || c == '=')) {
+            valid_base64 = false;
+            ESP_LOGE(TAG, "Invalid base64 character at offset %zu: 0x%02x ('%c')", i, (unsigned char)c, c);
+            break;
+        }
+    }
+    if (!valid_base64) {
+        ESP_LOGE(TAG, "Base64 string contains invalid characters (first 50 chars: %.50s)", base64_audio);
+        free(response.data);
+        return ESP_FAIL;
+    }
 
     // Decode base64 to PCM audio - allocate in PSRAM
     // Base64 encoding increases size by ~33%, so decoded size is ~75% of base64 size
@@ -684,7 +874,6 @@ esp_err_t gemini_tts_streaming(const char *text, gemini_tts_playback_callback_t 
         audio_samples = (int16_t *)heap_caps_malloc(audio_buffer_size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
         if (!audio_samples) {
             ESP_LOGE(TAG, "Failed to allocate %zu bytes for decoded audio", audio_buffer_size);
-            cJSON_Delete(json_root);
             free(response.data);
             return ESP_ERR_NO_MEM;
         }
@@ -693,11 +882,12 @@ esp_err_t gemini_tts_streaming(const char *text, gemini_tts_playback_callback_t 
     size_t decoded_len = 0;
     int mbedtls_ret = mbedtls_base64_decode((unsigned char *)audio_samples, audio_buffer_size, &decoded_len,
                                             (const unsigned char *)base64_audio, base64_len);
-    cJSON_Delete(json_root);
     free(response.data);
 
     if (mbedtls_ret != 0) {
-        ESP_LOGE(TAG, "Base64 decode failed: %d", mbedtls_ret);
+        ESP_LOGE(TAG, "Base64 decode failed: %d (base64_len=%zu)", mbedtls_ret, base64_len);
+        ESP_LOGE(TAG, "First 100 base64 chars: %.100s", base64_audio);
+        ESP_LOGE(TAG, "Last 100 base64 chars: %.100s", base64_audio + (base64_len > 100 ? base64_len - 100 : 0));
         free(audio_samples);
         return ESP_FAIL;
     }

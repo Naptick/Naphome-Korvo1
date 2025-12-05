@@ -28,7 +28,7 @@ esp_err_t korvo1_init(korvo1_t *dev, const korvo1_config_t *config)
     }
     
     i2s_config_t i2s_conf = {
-        .mode = I2S_MODE_MASTER | I2S_MODE_RX | I2S_MODE_PDM,
+        .mode = I2S_MODE_MASTER | I2S_MODE_RX,  // Standard I2S RX (not PDM) - Korvo1 uses ES7210 ADC
         .sample_rate = config->sample_rate_hz > 0 ? config->sample_rate_hz : 16000,
         .bits_per_sample = I2S_BITS_PER_SAMPLE_16BIT,
         .channel_format = ch_fmt,
@@ -42,7 +42,7 @@ esp_err_t korvo1_init(korvo1_t *dev, const korvo1_config_t *config)
     };
     const char* ch_fmt_str = (ch_fmt == I2S_CHANNEL_FMT_ONLY_LEFT) ? "ONLY_LEFT" :
                              (ch_fmt == I2S_CHANNEL_FMT_ONLY_RIGHT) ? "ONLY_RIGHT" : "STEREO";
-    ESP_LOGI(TAG, "I2S Configuration: mode=PDM_RX, sample_rate=%d, channel_format=%s, dma_bufs=%d x %d",
+    ESP_LOGI(TAG, "I2S Configuration: mode=I2S_RX (standard), sample_rate=%d, channel_format=%s, dma_bufs=%d x %d",
              (int)i2s_conf.sample_rate, ch_fmt_str, (int)i2s_conf.dma_buf_count, (int)i2s_conf.dma_buf_len);
     ESP_RETURN_ON_ERROR(i2s_driver_install(config->port, &i2s_conf, 0, NULL), TAG, "driver install failed");
 
