@@ -514,7 +514,8 @@ void app_main(void)
     host.max_freq_khz = SDMMC_FREQ_PROBING;  // Start with probing frequency (400kHz)
     
     // Configure SDMMC slot with explicit GPIO pins for Korvo1 hardware
-    // Hardware pinout confirmed from Korvo GitHub repository:
+    // Hardware pinout confirmed from official Korvo1 schematic:
+    // https://dl.espressif.com/dl/schematics/SCH_ESP32-S3-Korvo-1_V6_20211201.pdf
     // CLK=GPIO18 (ESP0_SD_CLK), CMD=GPIO17 (ESP0_SD_CMD), 
     // DAT0=GPIO16 (ESP0_SD_DAT0), DAT3=GPIO15 (ESP0_SD_DAT3), DET=GPIO7 (ESP0_SD_DET)
     sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();

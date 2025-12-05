@@ -165,13 +165,16 @@ sudo diskutil eraseDisk FAT32 KORVO1 MBRFormat /dev/disk2
 Verify your SD card is connected to the correct pins:
 
 **SDMMC Mode (1-bit, Korvo1 hardware):**
-- CLK: GPIO18 (ESP0_SD_CLK)
-- CMD: GPIO17 (ESP0_SD_CMD)
-- DAT0: GPIO16 (ESP0_SD_DAT0)
-- DAT3: GPIO15 (ESP0_SD_DAT3)
-- DET: GPIO7 (ESP0_SD_DET - card detect)
-- VDD: 3.3V
-- GND: Ground
+
+**Reference**: [Official Korvo1 Schematic V6](https://dl.espressif.com/dl/schematics/SCH_ESP32-S3-Korvo-1_V6_20211201.pdf)
+
+- **CLK**: GPIO18 (ESP0_SD_CLK)
+- **CMD**: GPIO17 (ESP0_SD_CMD)
+- **DAT0**: GPIO16 (ESP0_SD_DAT0)
+- **DAT3**: GPIO15 (ESP0_SD_DAT3)
+- **DET**: GPIO7 (ESP0_SD_DET - card detect)
+- **VDD**: 3.3V
+- **GND**: Ground
 
 **SPI Mode (fallback):**
 - MOSI: GPIO11

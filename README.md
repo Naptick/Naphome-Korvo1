@@ -14,10 +14,13 @@ ESP32-S3 firmware for Korvo1 development board featuring LED control and audio p
 ## Hardware
 
 - **Board**: ESP32-S3 based Korvo1 development board
+- **Schematic**: [Official Korvo1 Schematic V6](https://dl.espressif.com/dl/schematics/SCH_ESP32-S3-Korvo-1_V6_20211201.pdf)
 - **LEDs**: WS2812 RGB LED ring (12 LEDs, GPIO 19)
 - **Audio Codec**: ES8311 (I2S + I2C)
-  - I2S: BCLK=GPIO4, LRCLK=GPIO5, DATA=GPIO18, MCLK=GPIO0
-  - I2C: SCL=GPIO1, SDA=GPIO2
+  - I2S: BCLK=GPIO40, LRCLK=GPIO41, DATA=GPIO39, MCLK=GPIO42
+  - I2C: SCL=GPIO2, SDA=GPIO1
+- **SD Card**: SDMMC interface
+  - CLK=GPIO18, CMD=GPIO17, DAT0=GPIO16, DAT3=GPIO15, DET=GPIO7
 
 ## Project Structure
 
