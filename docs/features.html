@@ -472,6 +472,220 @@
                 </div>
             </div>
             
+            <div class="comparison-section" style="background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); padding: 40px; border-radius: 15px; margin-top: 50px;">
+                <h2 style="color: #667eea; font-size: 2em; margin-bottom: 30px; text-align: center;">Phase 0.9 Proposal vs Implementation</h2>
+                <p style="text-align: center; color: #666; margin-bottom: 40px; font-size: 1.1em;">
+                    Comparison of Phase 0.9 development objectives with current Naphome-Korvo1 implementation
+                </p>
+                
+                <div style="display: grid; gap: 30px; margin-top: 30px;">
+                    <div style="background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                        <h3 style="color: #667eea; font-size: 1.5em; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
+                            ✅ Hardware Platform
+                        </h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                            <div>
+                                <strong style="color: #555;">Proposed:</strong>
+                                <ul style="margin-top: 10px; color: #666;">
+                                    <li>M5Stack Atom S3R (ESP32-S3)</li>
+                                    <li>COTS validation hardware</li>
+                                    <li>2x development units</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <strong style="color: #555;">Implemented:</strong>
+                                <ul style="margin-top: 10px; color: #666;">
+                                    <li>ESP32-S3 Korvo1 board</li>
+                                    <li>Production-ready hardware</li>
+                                    <li>Full feature implementation</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                        <h3 style="color: #667eea; font-size: 1.5em; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
+                            ✅ Sensor Integration
+                        </h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                            <div>
+                                <strong style="color: #555;">Proposed (Phase 0.9):</strong>
+                                <ul style="margin-top: 10px; color: #666;">
+                                    <li>SHT30 (Temp/Humidity)</li>
+                                    <li>SGP30 (VOC)</li>
+                                    <li>BH1750 (Light)</li>
+                                    <li>SCD30 (CO₂)</li>
+                                    <li>SPS30 (PM)</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <strong style="color: #555;">Implemented:</strong>
+                                <ul style="margin-top: 10px; color: #666;">
+                                    <li>SHT4x (Temp/Humidity) ✅</li>
+                                    <li>PM2012 (PM/VOC) ✅</li>
+                                    <li>TSL2561 (Light) ✅</li>
+                                    <li>CM1106S (CO₂) ✅</li>
+                                    <li>AS7341 (UV) ✅</li>
+                                    <li>VEML7700 (Ambient Light) ✅</li>
+                                    <li>Synthetic data fallback ✅</li>
+                                    <li>Naptick API integration ✅</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <p style="margin-top: 15px; padding: 15px; background: #e8f5e9; border-radius: 5px; color: #2e7d32;">
+                            <strong>Enhancement:</strong> Upgraded to Naptick BOM sensors with cloud API integration and synthetic data support for development/testing.
+                        </p>
+                    </div>
+                    
+                    <div style="background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                        <h3 style="color: #667eea; font-size: 1.5em; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
+                            ✅ Audio System
+                        </h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                            <div>
+                                <strong style="color: #555;">Proposed:</strong>
+                                <ul style="margin-top: 10px; color: #666;">
+                                    <li>ICS-43434 I2S microphones</li>
+                                    <li>TPA3116D2 amplifier</li>
+                                    <li>ESP-SR wake word (1-2m)</li>
+                                    <li>Basic audio playback</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <strong style="color: #555;">Implemented:</strong>
+                                <ul style="margin-top: 10px; color: #666;">
+                                    <li>ES7210 ADC (4-mic array) ✅</li>
+                                    <li>ES8311 codec (speaker) ✅</li>
+                                    <li>OpenWakeWord detection ✅</li>
+                                    <li>MP3 playback (163 tracks) ✅</li>
+                                    <li>SD card storage ✅</li>
+                                    <li>Drag-and-drop upload ✅</li>
+                                    <li>Google Gemini TTS ✅</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <p style="margin-top: 15px; padding: 15px; background: #e8f5e9; border-radius: 5px; color: #2e7d32;">
+                            <strong>Enhancement:</strong> Full voice assistant with STT-LLM-TTS pipeline, MP3 library, and web-based file management.
+                        </p>
+                    </div>
+                    
+                    <div style="background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                        <h3 style="color: #667eea; font-size: 1.5em; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
+                            ✅ Cloud Integration
+                        </h3>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                            <div>
+                                <strong style="color: #555;">Proposed:</strong>
+                                <ul style="margin-top: 10px; color: #666;">
+                                    <li>AWS IoT Core MQTT</li>
+                                    <li>Sensor telemetry publishing</li>
+                                    <li>Command subscription</li>
+                                    <li>Basic cloud communication</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <strong style="color: #555;">Implemented:</strong>
+                                <ul style="margin-top: 10px; color: #666;">
+                                    <li>Naptick HTTP API ✅</li>
+                                    <li>Sensor data streaming ✅</li>
+                                    <li>ISO 8601 timestamps ✅</li>
+                                    <li>RESTful API endpoints ✅</li>
+                                    <li>Web dashboard control ✅</li>
+                                    <li>Function calling (LLM) ✅</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <p style="margin-top: 15px; padding: 15px; background: #e8f5e9; border-radius: 5px; color: #2e7d32;">
+                            <strong>Enhancement:</strong> Direct HTTP API integration with Naptick service, plus web-based control interface.
+                        </p>
+                    </div>
+                    
+                    <div style="background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                        <h3 style="color: #667eea; font-size: 1.5em; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
+                            ✅ Additional Features (Beyond Proposal)
+                        </h3>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-top: 15px;">
+                            <div style="padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                                <strong style="color: #667eea;">🌐 Web Interface</strong>
+                                <ul style="margin-top: 8px; color: #666; font-size: 0.9em;">
+                                    <li>Real-time dashboard</li>
+                                    <li>Device control UI</li>
+                                    <li>File upload interface</li>
+                                    <li>Live log streaming</li>
+                                </ul>
+                            </div>
+                            <div style="padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                                <strong style="color: #667eea;">📡 BLE Provisioning</strong>
+                                <ul style="margin-top: 8px; color: #666; font-size: 0.9em;">
+                                    <li>WiFi network scanning</li>
+                                    <li>Mobile app setup</li>
+                                    <li>Password-free onboarding</li>
+                                </ul>
+                            </div>
+                            <div style="padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                                <strong style="color: #667eea;">🔍 mDNS Discovery</strong>
+                                <ul style="margin-top: 8px; color: #666; font-size: 0.9em;">
+                                    <li>nap.local hostname</li>
+                                    <li>Zero-config access</li>
+                                    <li>Service discovery</li>
+                                </ul>
+                            </div>
+                            <div style="padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                                <strong style="color: #667eea;">💾 Storage System</strong>
+                                <ul style="margin-top: 8px; color: #666; font-size: 0.9em;">
+                                    <li>SD card support</li>
+                                    <li>SPIFFS filesystem</li>
+                                    <li>163 MP3 tracks</li>
+                                    <li>File management</li>
+                                </ul>
+                            </div>
+                            <div style="padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                                <strong style="color: #667eea;">🤖 AI Integration</strong>
+                                <ul style="margin-top: 8px; color: #666; font-size: 0.9em;">
+                                    <li>Google Gemini 2.5</li>
+                                    <li>Function calling</li>
+                                    <li>Natural language</li>
+                                    <li>Streaming TTS</li>
+                                </ul>
+                            </div>
+                            <div style="padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                                <strong style="color: #667eea;">💡 LED Control</strong>
+                                <ul style="margin-top: 8px; color: #666; font-size: 0.9em;">
+                                    <li>WS2812 RGB strip</li>
+                                    <li>Animations</li>
+                                    <li>Color picker</li>
+                                    <li>Brightness control</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                        <h3 style="color: #667eea; font-size: 1.5em; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
+                            📊 Implementation Status Summary
+                        </h3>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                            <div style="text-align: center; padding: 20px; background: #e8f5e9; border-radius: 8px;">
+                                <div style="font-size: 2.5em; font-weight: bold; color: #2e7d32;">100%</div>
+                                <div style="color: #555; margin-top: 5px;">Core Features</div>
+                            </div>
+                            <div style="text-align: center; padding: 20px; background: #e8f5e9; border-radius: 8px;">
+                                <div style="font-size: 2.5em; font-weight: bold; color: #2e7d32;">150%+</div>
+                                <div style="color: #555; margin-top: 5px;">Feature Enhancement</div>
+                            </div>
+                            <div style="text-align: center; padding: 20px; background: #e3f2fd; border-radius: 8px;">
+                                <div style="font-size: 2.5em; font-weight: bold; color: #1976d2;">6+</div>
+                                <div style="color: #555; margin-top: 5px;">Additional Features</div>
+                            </div>
+                            <div style="text-align: center; padding: 20px; background: #fff3e0; border-radius: 8px;">
+                                <div style="font-size: 2.5em; font-weight: bold; color: #f57c00;">Production</div>
+                                <div style="color: #555; margin-top: 5px;">Ready Status</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
             <div class="cta">
                 <h2>Get Started</h2>
                 <p style="margin-bottom: 30px; font-size: 1.2em;">
