@@ -540,7 +540,7 @@ void app_main(void)
     
     sdmmc_host_t host = SDMMC_HOST_DEFAULT();
     host.flags = SDMMC_HOST_FLAG_1BIT;  // Use 1-bit mode for compatibility
-    // Use lower frequency for better compatibility with slower cards
+    // Start with probing frequency, will increase after card detection
     host.max_freq_khz = SDMMC_FREQ_PROBING;  // Start with probing frequency (400kHz)
     
     // Configure SDMMC slot with explicit GPIO pins for Korvo1 hardware
@@ -572,10 +572,15 @@ void app_main(void)
         ESP_LOGI(TAG, "✅ SD card mounted at %s", mount_point);
         
         // After successful mount, increase frequency for better performance
-        if (card->max_freq_khz > host.max_freq_khz) {
-            ESP_LOGI(TAG, "Card supports up to %lu kHz, but using %lu kHz for stability",
-                     (unsigned long)card->max_freq_khz, (unsigned long)host.max_freq_khz);
+        // Most SD cards support at least 20MHz (20000 kHz) in 1-bit mode
+        uint32_t target_freq = 20000;  // 20MHz - good balance of speed and stability
+        if (card->max_freq_khz > target_freq) {
+            target_freq = card->max_freq_khz;
         }
+        // Reconfigure host with higher frequency
+        host.max_freq_khz = target_freq;
+        ESP_LOGI(TAG, "SD card supports up to %lu kHz, using %lu kHz for better performance",
+                 (unsigned long)card->max_freq_khz, (unsigned long)target_freq);
     } else {
         ESP_LOGE(TAG, "SDMMC mount failed: %s (0x%x)", esp_err_to_name(ret), ret);
         ESP_LOGE(TAG, "Error details: send_op_cond timeout - card not responding");

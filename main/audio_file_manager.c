@@ -444,6 +444,18 @@ static void mp3_playback_task(void *arg)
         return;
     }
     ESP_LOGI(TAG, "File opened successfully: %s", file_path);
+    
+    // Increase file buffer size for SD card reads (reduces system calls)
+    // Use larger buffer to reduce SD card access frequency
+    // Note: setvbuf buffer is automatically freed when file is closed
+    const size_t file_buffer_size = 16384;  // 16KB file buffer
+    uint8_t *file_buffer_ptr = malloc(file_buffer_size);
+    if (file_buffer_ptr) {
+        setvbuf(fp, (char *)file_buffer_ptr, _IOFBF, file_buffer_size);
+        ESP_LOGI(TAG, "File buffer set to %zu bytes for SD card optimization", file_buffer_size);
+    } else {
+        ESP_LOGW(TAG, "Failed to allocate file buffer, using default (may cause SD card read issues)");
+    }
 
     // Create MP3 decoder
     ESP_LOGI(TAG, "Creating MP3 decoder...");
@@ -460,8 +472,9 @@ static void mp3_playback_task(void *arg)
     ESP_LOGI(TAG, "MP3 decoder created successfully");
 
     // Allocate buffers
-    // Increase MP3 buffer size to reduce SD card read frequency
-    const size_t mp3_buffer_size = 8192;  // Increased from 4096 to reduce SD card reads
+    // Increase MP3 buffer size significantly for SD card playback
+    // Larger buffer = fewer SD card reads = less chance of underruns
+    const size_t mp3_buffer_size = 32768;  // 32KB buffer for SD card (was 8KB)
     const size_t pcm_buffer_size = 1152 * 2 * sizeof(int16_t);
     
     // MP3 buffer can be in PSRAM (only accessed from task, not from interrupt)
@@ -501,6 +514,18 @@ static void mp3_playback_task(void *arg)
     bool eof = false;
     int frame_count = 0;
 
+    // Pre-fill MP3 buffer before starting playback (critical for SD card)
+    // This prevents buffer underruns during playback
+    ESP_LOGI(TAG, "Pre-filling MP3 buffer from SD card...");
+    size_t prefill_read = fread(mp3_buffer, 1, mp3_buffer_size, fp);
+    if (prefill_read > 0) {
+        bytes_read = prefill_read;
+        ESP_LOGI(TAG, "Pre-filled %zu bytes into MP3 buffer", prefill_read);
+    } else {
+        ESP_LOGE(TAG, "Failed to pre-fill buffer - file may be empty or unreadable");
+        eof = true;
+    }
+
     ESP_LOGI(TAG, "Starting MP3 decode loop...");
     while (s_playing && !eof) {
         // Check duration limit
@@ -512,12 +537,17 @@ static void mp3_playback_task(void *arg)
             }
         }
         // Read MP3 data from SD card
-        // Yield periodically during SD card reads to prevent blocking I2S DMA
-        if (bytes_read < mp3_buffer_size) {
+        // Pre-fill buffer aggressively to prevent underruns
+        // Only read when buffer is less than 50% full to maintain headroom
+        const size_t refill_threshold = mp3_buffer_size / 2;  // Refill when < 50% full
+        if (bytes_read < refill_threshold) {
             size_t to_read = mp3_buffer_size - bytes_read;
-            // Read in smaller chunks to avoid long blocking SD card operations
-            const size_t chunk_size = 1024;  // Read 1KB at a time
+            // Read larger chunks for SD card (file buffer handles smaller reads)
+            // Read up to 8KB at a time for better SD card efficiency
+            const size_t chunk_size = 8192;  // Read 8KB at a time (file buffer will handle smaller ops)
             size_t total_read = 0;
+            int64_t read_start = esp_timer_get_time();
+            
             while (total_read < to_read && !eof) {
                 size_t this_read = (to_read - total_read > chunk_size) ? chunk_size : (to_read - total_read);
                 size_t read = fread(mp3_buffer + bytes_read + total_read, 1, this_read, fp);
@@ -525,12 +555,18 @@ static void mp3_playback_task(void *arg)
                     eof = true;
                 }
                 total_read += read;
-                // Yield after each chunk to allow I2S DMA to continue
-                if (total_read < to_read && !eof) {
-                    vTaskDelay(pdMS_TO_TICKS(1));  // Yield to I2S DMA
+                
+                // Yield periodically but less frequently (file buffer reduces system call overhead)
+                if (total_read < to_read && !eof && (total_read % 4096 == 0)) {
+                    vTaskDelay(pdMS_TO_TICKS(1));  // Yield every 4KB
                 }
             }
+            
             bytes_read += total_read;
+            int64_t read_time = esp_timer_get_time() - read_start;
+            if (read_time > 10000) {  // Log if read took > 10ms
+                ESP_LOGW(TAG, "SD card read took %lld us for %zu bytes", read_time, total_read);
+            }
         }
 
         if (bytes_read == 0) {
@@ -600,7 +636,10 @@ static void mp3_playback_task(void *arg)
     free(mp3_buffer);
     free(pcm_buffer);
     mp3_decoder_destroy(decoder);
+    
+    // Close file (setvbuf buffer is automatically freed when file is closed)
     fclose(fp);
+    
     free(params->file_path);
     free(params);
 
