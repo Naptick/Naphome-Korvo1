@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Naphome-Korvo1 TODO List</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            line-height: 1.6;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        header .meta {
+            font-size: 0.9em;
+            opacity: 0.9;
+            margin-top: 20px;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 30px 0;
+        }
+        
+        .stat-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            border-left: 4px solid #667eea;
+        }
+        
+        .stat-card .number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .stat-card .label {
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .section {
+            margin-bottom: 40px;
+        }
+        
+        .section h2 {
+            color: #667eea;
+            font-size: 1.8em;
+            margin-bottom: 20px;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .todo-item {
+            background: #f8f9fa;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .todo-item.todo {
+            border-left-color: #f57c00;
+        }
+        
+        .todo-item.fixme {
+            border-left-color: #d32f2f;
+        }
+        
+        .todo-item.note {
+            border-left-color: #1976d2;
+        }
+        
+        .todo-item.hack {
+            border-left-color: #7b1fa2;
+        }
+        
+        .todo-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .todo-type {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .todo-type.TODO {
+            background: #fff3e0;
+            color: #f57c00;
+        }
+        
+        .todo-type.FIXME {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+        
+        .todo-type.NOTE {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        
+        .todo-type.HACK {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+        
+        .todo-file {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #666;
+        }
+        
+        .todo-message {
+            color: #333;
+            font-weight: 500;
+            margin: 10px 0;
+        }
+        
+        .todo-context {
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            color: #999;
+            background: #fff;
+            padding: 8px;
+            border-radius: 4px;
+            margin-top: 8px;
+        }
+        
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📋 Naphome-Korvo1 TODO List</h1>
+            <div class="meta">
+                <p>Generated: 2025-12-05 15:59:24</p>
+                <p>Total Items: 35</p>
+            </div>
+        </header>
+        
+        <div class="content">
+            <a href="features.html" class="back-link">← Back to Features Page</a>
+            
+            <div class="stats">
+                <div class="stat-card">
+                    <div class="number">35</div>
+                    <div class="label">Total Items</div>
+                </div>
+                <div class="stat-card">
+                    <div class="number">14</div>
+                    <div class="label">TODO</div>
+                </div>
+                <div class="stat-card">
+                    <div class="number">1</div>
+                    <div class="label">FIXME</div>
+                </div>
+                <div class="stat-card">
+                    <div class="number">20</div>
+                    <div class="label">NOTE</div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>Hardware (2)</h2>
+
+                <div class="todo-item todo">
+                    <div class="todo-header">
+                        <span class="todo-type TODO">TODO</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/components/sensor_manager/src/sensor_integration.c:97</span>
+                    </div>
+                    <div class="todo-message">Re-enable when sensor driver components are available</div>
+                    <div class="todo-context">| // TODO: Re-enable when sensor driver components are available | // Initialize I2C master bus</div>
+                </div>
+
+                <div class="todo-item todo">
+                    <div class="todo-header">
+                        <span class="todo-type TODO">TODO</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/components/sensor_manager/src/sensor_integration.c:235</span>
+                    </div>
+                    <div class="todo-message">Re-enable when sensor driver components are available</div>
+                    <div class="todo-context">while (s_running) { | // TODO: Re-enable when sensor driver components are available | // For now, generate synthetic sensor data</div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>Audio (9)</h2>
+
+                <div class="todo-item note">
+                    <div class="todo-header">
+                        <span class="todo-type NOTE">NOTE</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/components/openwakeword/openwakeword_esp32.cpp:225</span>
+                    </div>
+                    <div class="todo-message">Using 512 samples to match mic capture task output (not 1024)</div>
+                    <div class="todo-context">// This prevents queue overflow during processing delays while conserving memory | // Note: Using 512 samples to match mic capture task output (not 1024) | const size_t queue_size = 16;  // Reduced from 64 to 16 to save internal RAM (64KB -> 16KB)</div>
+                </div>
+
+                <div class="todo-item note">
+                    <div class="todo-header">
+                        <span class="todo-type NOTE">NOTE</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/components/somnus_ble/src/somnus_ble.c:408</span>
+                    </div>
+                    <div class="todo-message">ble_gatts_notify_custom consumes the mbuf on success, so we don't free it</div>
+                    <div class="todo-context">// Allocate mbuf with the chunk data | // Note: ble_gatts_notify_custom consumes the mbuf on success, so we don't free it | struct os_mbuf *om = ble_hs_mbuf_from_flat(s_tx_buffer, chunk_len);</div>
+                </div>
+
+                <div class="todo-item note">
+                    <div class="todo-header">
+                        <span class="todo-type NOTE">NOTE</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/main/action_manager.c:180</span>
+                    </div>
+                    <div class="todo-message">Audio file playback not implemented yet</div>
+                    <div class="todo-context">case ACTION_SONG_CHANGE: { | // Note: Audio file playback not implemented yet | // For now, we can use TTS to speak the song name</div>
+                </div>
+
+                <div class="todo-item note">
+                    <div class="todo-header">
+                        <span class="todo-type NOTE">NOTE</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/main/app_main.c:841</span>
+                    </div>
+                    <div class="todo-message">wake word manager may not be initialized yet, but that's OK</div>
+                    <div class="todo-context">// Pause wake word detection during TTS (if initialized) | // Note: wake word manager may not be initialized yet, but that's OK | wake_word_manager_pause();</div>
+                </div>
+
+                <div class="todo-item note">
+                    <div class="todo-header">
+                        <span class="todo-type NOTE">NOTE</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/main/voice_assistant.c:290</span>
+                    </div>
+                    <div class="todo-message">TTS typically outputs at 24kHz, but our audio player may be at 48kHz</div>
+                    <div class="todo-context">// Step 4: Play audio response | // Note: TTS typically outputs at 24kHz, but our audio player may be at 48kHz | // We'll need to resample or configure TTS for 48kHz</div>
+                </div>
+
+                <div class="todo-item note">
+                    <div class="todo-header">
+                        <span class="todo-type NOTE">NOTE</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/main/voice_assistant.c:445</span>
+                    </div>
+                    <div class="todo-message">Wake word detection should be paused during TTS playback to prevent feedback</div>
+                    <div class="todo-context">// This avoids buffering entire audio in memory | // Note: Wake word detection should be paused during TTS playback to prevent feedback | return audio_player_submit_pcm(samples, sample_count, 24000, 1);</div>
+                </div>
+
+                <div class="todo-item note">
+                    <div class="todo-header">
+                        <span class="todo-type NOTE">NOTE</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/main/wake_word_manager.c:773</span>
+                    </div>
+                    <div class="todo-message">I2S channel remains enabled but task is stopped</div>
+                    <div class="todo-context">openwakeword_stop(); | // Note: I2S channel remains enabled but task is stopped | // Disabling I2S channel causes issues with TLS operations, so we just stop the task</div>
+                </div>
+
+                <div class="todo-item todo">
+                    <div class="todo-header">
+                        <span class="todo-type TODO">TODO</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/main/voice_assistant.c:35</span>
+                    </div>
+                    <div class="todo-message">Get audio from wake word detection or queue</div>
+                    <div class="todo-context">| // TODO: Get audio from wake word detection or queue | // This is a placeholder - actual implementation would:</div>
+                </div>
+
+                <div class="todo-item todo">
+                    <div class="todo-header">
+                        <span class="todo-type TODO">TODO</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/main/voice_assistant.c:51</span>
+                    </div>
+                    <div class="todo-message">Start recording audio for command</div>
+                    <div class="todo-context">| // TODO: Start recording audio for command | // For now, this is a placeholder</div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>Networking (4)</h2>
+
+                <div class="todo-item note">
+                    <div class="todo-header">
+                        <span class="todo-type NOTE">NOTE</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/components/somnus_ble/src/somnus_ble.c:981</span>
+                    </div>
+                    <div class="todo-message">There's no direct API to check if WiFi is started, so we check mode</div>
+                    <div class="todo-context">// Try to get WiFi status - if this succeeds, WiFi is likely already started | // Note: There's no direct API to check if WiFi is started, so we check mode | // and handle ESP_ERR_INVALID_STATE from esp_wifi_start() gracefully</div>
+                </div>
+
+                <div class="todo-item note">
+                    <div class="todo-header">
+                        <span class="todo-type NOTE">NOTE</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/components/somnus_ble/src/somnus_ble.c:1017</span>
+                    </div>
+                    <div class="todo-message">esp_wifi_start() internally calls esp_netif_create_default_wifi_sta() if netif doesn't exist.</div>
+                    <div class="todo-context">// Start WiFi - required for scanning | // NOTE: esp_wifi_start() internally calls esp_netif_create_default_wifi_sta() if netif doesn't exist. | // If netif already exists (from previous init), it should handle it gracefully.</div>
+                </div>
+
+                <div class="todo-item todo">
+                    <div class="todo-header">
+                        <span class="todo-type TODO">TODO</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/components/gemini/gemini_api.c:223</span>
+                    </div>
+                    <div class="todo-message">Re-enable certificate verification once certificate bundle issue is resolved</div>
+                    <div class="todo-context">| // TODO: Re-enable certificate verification once certificate bundle issue is resolved | // Currently skipping due to PK verify errors (0x4290) - certificate signature verification failing</div>
+                </div>
+
+                <div class="todo-item todo">
+                    <div class="todo-header">
+                        <span class="todo-type TODO">TODO</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/components/sensor_manager/src/sensor_manager.c:337</span>
+                    </div>
+                    <div class="todo-message">Re-enable certificate verification once certificate bundle issue is resolved</div>
+                    <div class="todo-context">// Publish to HTTP API | // TODO: Re-enable certificate verification once certificate bundle issue is resolved | // Currently skipping due to PK verify errors (0x4290) - certificate signature verification failing</div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>AI/Voice (2)</h2>
+
+                <div class="todo-item todo">
+                    <div class="todo-header">
+                        <span class="todo-type TODO">TODO</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/main/wake_word_manager.c:558</span>
+                    </div>
+                    <div class="todo-message">Process transcribed text (e.g., send to LLM, execute commands)</div>
+                    <div class="todo-context">ESP_LOGI(TAG, "✅ [STT] Transcribed: \"%s\"", text); | // TODO: Process transcribed text (e.g., send to LLM, execute commands) | } else if (stt_ret == ESP_OK) {</div>
+                </div>
+
+                <div class="todo-item todo">
+                    <div class="todo-header">
+                        <span class="todo-type TODO">TODO</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/main/wake_word_manager.c:587</span>
+                    </div>
+                    <div class="todo-message">Process transcribed text (e.g., send to LLM, execute commands)</div>
+                    <div class="todo-context">ESP_LOGI(TAG, "✅ [STT] Transcribed: \"%s\"", text); | // TODO: Process transcribed text (e.g., send to LLM, execute commands) | } else if (stt_ret == ESP_OK) {</div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>UI/Display (2)</h2>
+
+                <div class="todo-item note">
+                    <div class="todo-header">
+                        <span class="todo-type NOTE">NOTE</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/convert_simple_tf.py:22</span>
+                    </div>
+                    <div class="todo-message">TensorFlow doesn't have built-in ONNX import</div>
+                    <div class="todo-context"># Try tf.compat.v1 or other methods | # Note: TensorFlow doesn't have built-in ONNX import |</div>
+                </div>
+
+                <div class="todo-item note">
+                    <div class="todo-header">
+                        <span class="todo-type NOTE">NOTE</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/managed_components/espressif__mdns/tests/test_afl_fuzz_host/test.c:234</span>
+                    </div>
+                    <div class="todo-message">parameter1 is a file (mangled packet) which caused the crash</div>
+                    <div class="todo-context">// | // Note: parameter1 is a file (mangled packet) which caused the crash | file = fopen(argv[1], "r");</div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>Testing (2)</h2>
+
+                <div class="todo-item note">
+                    <div class="todo-header">
+                        <span class="todo-type NOTE">NOTE</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/test_wake_word.py:89</span>
+                    </div>
+                    <div class="todo-message">OpenWakeWord doesn't have a "hey_nap" model, so we'll test with "hey_jarvis"</div>
+                    <div class="todo-context"># Initialize OpenWakeWord model | # Note: OpenWakeWord doesn't have a "hey_nap" model, so we'll test with "hey_jarvis" | # as a baseline to verify the detection pipeline works</div>
+                </div>
+
+                <div class="todo-item todo">
+                    <div class="todo-header">
+                        <span class="todo-type TODO">TODO</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/managed_components/espressif__mdns/examples/query_advertise/pytest_mdns.py:151</span>
+                    </div>
+                    <div class="todo-message">Add test for example disabling IPV4</div>
+                    <div class="todo-context">try: | # TODO: Add test for example disabling IPV4 | mdns_responder.start()</div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>General (14)</h2>
+
+                <div class="todo-item fixme">
+                    <div class="todo-header">
+                        <span class="todo-type FIXME">FIXME</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/managed_components/espressif__esp_codec_dev/device/tas5805m/tas5805m.c:168</span>
+                    </div>
+                    <div class="todo-message">Got the digit volume is not right.</div>
+                    <div class="todo-context">{ | /// FIXME: Got the digit volume is not right. | int vol_idx = 0;</div>
+                </div>
+
+                <div class="todo-item note">
+                    <div class="todo-header">
+                        <span class="todo-type NOTE">NOTE</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/components/gemini/gemini_api.c:262</span>
+                    </div>
+                    <div class="todo-message">Don't set Accept-Encoding headers - let server decide</div>
+                    <div class="todo-context">esp_http_client_set_header(client, "Content-Type", "application/json"); | // Note: Don't set Accept-Encoding headers - let server decide | // ESP32's HTTP client has automatic gzip decompression support</div>
+                </div>
+
+                <div class="todo-item note">
+                    <div class="todo-header">
+                        <span class="todo-type NOTE">NOTE</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/components/openwakeword/openwakeword_esp32.cpp:31</span>
+                    </div>
+                    <div class="todo-message">This is a placeholder implementation</div>
+                    <div class="todo-context">// OpenWakeWord integration | // Note: This is a placeholder implementation | // To use actual OpenWakeWord, you need to:</div>
+                </div>
+
+                <div class="todo-item note">
+                    <div class="todo-header">
+                        <span class="todo-type NOTE">NOTE</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/components/somnus_ble/src/somnus_ble.c:521</span>
+                    </div>
+                    <div class="todo-message">Device name is already set via ble_svc_gap_device_name_set, so device will be discoverable</div>
+                    <div class="todo-context">// Set advertising fields - this must be called when advertising is stopped | // Note: Device name is already set via ble_svc_gap_device_name_set, so device will be discoverable | // even if this fails. The service UUID in advertising data is optional.</div>
+                </div>
+
+                <div class="todo-item note">
+                    <div class="todo-header">
+                        <span class="todo-type NOTE">NOTE</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/components/somnus_ble/src/somnus_ble.c:1241</span>
+                    </div>
+                    <div class="todo-message">nimble_port_init() handles controller initialization internally</div>
+                    <div class="todo-context">// Initialize NimBLE port (matches ESP-IDF reference examples) | // Note: nimble_port_init() handles controller initialization internally | // Reference examples do NOT call esp_nimble_hci_and_controller_init() separately</div>
+                </div>
+
+                <div class="todo-item note">
+                    <div class="todo-header">
+                        <span class="todo-type NOTE">NOTE</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/main/action_manager.c:164</span>
+                    </div>
+                    <div class="todo-message">ES8311 volume control would go here</div>
+                    <div class="todo-context">| // Note: ES8311 volume control would go here | // For now, we just store the volume level</div>
+                </div>
+
+                <div class="todo-item note">
+                    <div class="todo-header">
+                        <span class="todo-type NOTE">NOTE</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/main/app_main.c:633</span>
+                    </div>
+                    <div class="todo-message">mkdir may not be available, but we'll try</div>
+                    <div class="todo-context">// Directory doesn't exist, try to create it | // Note: mkdir may not be available, but we'll try | ESP_LOGI(TAG, "SD card sounds directory will be created when files are copied");</div>
+                </div>
+
+                <div class="todo-item note">
+                    <div class="todo-header">
+                        <span class="todo-type NOTE">NOTE</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/main/app_main.c:1118</span>
+                    </div>
+                    <div class="todo-message">Main task has been removed from watchdog, so no need to feed it here</div>
+                    <div class="todo-context">// Main loop: voice assistant mode with continuous LED effects | // Note: Main task has been removed from watchdog, so no need to feed it here | while (true) {</div>
+                </div>
+
+                <div class="todo-item note">
+                    <div class="todo-header">
+                        <span class="todo-type NOTE">NOTE</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/main/wake_word_manager.c:95</span>
+                    </div>
+                    <div class="todo-message">ES7210_CODEC_DEFAULT_ADDR is 0x80 (8-bit address)</div>
+                    <div class="todo-context">// Step 3: Create I2C control interface | // Note: ES7210_CODEC_DEFAULT_ADDR is 0x80 (8-bit address) | // I2C port should be I2C_NUM_0 (same as ES8311, initialized by audio_player)</div>
+                </div>
+
+                <div class="todo-item todo">
+                    <div class="todo-header">
+                        <span class="todo-type TODO">TODO</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/components/helix_mp3/include/minimp3.h:180</span>
+                    </div>
+                    <div class="todo-message">detect neon for !MINIMP3_ONLY_SIMD</div>
+                    <div class="todo-context">static int have_simd() | {   /* TODO: detect neon for !MINIMP3_ONLY_SIMD */ | return 1;</div>
+                </div>
+
+                <div class="todo-item todo">
+                    <div class="todo-header">
+                        <span class="todo-type TODO">TODO</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/components/openwakeword/openwakeword_esp32.cpp:82</span>
+                    </div>
+                    <div class="todo-message">Replace with actual OpenWakeWord model inference</div>
+                    <div class="todo-context">// Simple energy-based wake word detection (placeholder) | // TODO: Replace with actual OpenWakeWord model inference | static float energy_history[10] = {0};  // Keep last 10 chunks</div>
+                </div>
+
+                <div class="todo-item todo">
+                    <div class="todo-header">
+                        <span class="todo-type TODO">TODO</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/components/openwakeword/openwakeword_esp32.cpp:239</span>
+                    </div>
+                    <div class="todo-message">Load OpenWakeWord model</div>
+                    <div class="todo-context">| // TODO: Load OpenWakeWord model | // Example:</div>
+                </div>
+
+                <div class="todo-item todo">
+                    <div class="todo-header">
+                        <span class="todo-type TODO">TODO</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/components/openwakeword/openwakeword_esp32.cpp:389</span>
+                    </div>
+                    <div class="todo-message">Free OpenWakeWord model</div>
+                    <div class="todo-context">| // TODO: Free OpenWakeWord model | // if (s_model) {</div>
+                </div>
+
+                <div class="todo-item todo">
+                    <div class="todo-header">
+                        <span class="todo-type TODO">TODO</span>
+                        <span class="todo-file">/Users/danielmcshan/GitHub/Naphome-Korvo1/components/openwakeword/openwakeword_wrapper.cpp:6</span>
+                    </div>
+                    <div class="todo-message">When OpenWakeWord is added as a component/submodule, include it here:</div>
+                    <div class="todo-context">| // TODO: When OpenWakeWord is added as a component/submodule, include it here: | // #include "openwakeword/openwakeword.h"</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</body>
+</html>

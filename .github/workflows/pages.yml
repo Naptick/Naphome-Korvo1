@@ -6,6 +6,9 @@ on:
       - main
     paths:
       - 'docs/**'
+      - 'scripts/generate_todo_page.py'
+      - 'main/**'
+      - 'components/**'
   workflow_dispatch:
 
 permissions:
@@ -26,6 +29,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Generate TODO Page
+        run: |
+          python3 scripts/generate_todo_page.py
       
       - name: Setup Pages
         uses: actions/configure-pages@v4
