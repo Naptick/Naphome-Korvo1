@@ -135,6 +135,12 @@
             background: #e3f2fd;
         }
         
+        table tfoot tr {
+            background: #667eea;
+            color: white;
+            font-weight: bold;
+        }
+        
         .price-box {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -196,6 +202,7 @@
             font-family: 'Courier New', monospace;
             font-size: 0.85em;
             overflow-x: auto;
+            white-space: pre;
         }
         
         .back-link {
@@ -207,6 +214,29 @@
         }
         
         .back-link:hover {
+            text-decoration: underline;
+        }
+        
+        hr {
+            border: none;
+            border-top: 2px solid #ddd;
+            margin: 30px 0;
+        }
+        
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        
+        a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        
+        a:hover {
             text-decoration: underline;
         }
     </style>
@@ -232,14 +262,21 @@
                 <div class="label">Development Timeline: 3 weeks billable, 4 weeks calendar (Nov 1 – Nov 30, 2025)</div>
             </div>
             
-            <div class="highlight-box">
-                <h3>Executive Summary</h3>
+            <div class="section">
+                <h2>Executive Summary</h2>
                 <p>This quote outlines the complete development of Naphome Phase 0.9 (COTS Validation), including both hardware procurement and firmware development. This phase utilizes M5Stack components with identical ICs and pin connections to Phase I custom PCB, ensuring seamless firmware transition and validation of the exact production architecture.</p>
-                <p><strong>IMPORTANT NOTE:</strong> This Phase 0.9 development work is completely separate from any factory liaison activities for Phase I (P1) or Phase II (P2) production. This quote covers only the COTS validation and firmware development for Phase 0.9, with no involvement in manufacturing, production setup, or factory coordination for future phases.</p>
+                <div class="highlight-box">
+                    <p><strong>IMPORTANT NOTE:</strong> This Phase 0.9 development work is completely separate from any factory liaison activities for Phase I (P1) or Phase II (P2) production. This quote covers only the COTS validation and firmware development for Phase 0.9, with no involvement in manufacturing, production setup, or factory coordination for future phases.</p>
+                </div>
+                <p><strong>Start Date:</strong> November 1, 2025<br>
+                <strong>End Date:</strong> November 30, 2025</p>
             </div>
             
+            <hr>
+            
             <div class="section">
-                <h2>Hardware Components (2x Units)</h2>
+                <h2>Hardware Components (2x Units) - Phase 0.9 COTS Validation</h2>
+                <h3>Primary Development Platform</h3>
                 <table>
                     <thead>
                         <tr>
@@ -253,7 +290,7 @@
                     </thead>
                     <tbody>
                         <tr>
-                            <td>M5Stack Atom S3R</td>
+                            <td><strong>M5Stack Atom S3R</strong></td>
                             <td>ESP32-S3 with 0.85" display</td>
                             <td>2</td>
                             <td>$15</td>
@@ -261,7 +298,7 @@
                             <td>Compact platform with Port A I2C and I2S output</td>
                         </tr>
                         <tr>
-                            <td>STEMMA/QWIIC Cables</td>
+                            <td><strong>STEMMA/QWIIC Cables</strong></td>
                             <td>4-pin JST SH cables</td>
                             <td>5</td>
                             <td>$2</td>
@@ -269,7 +306,15 @@
                             <td>I2C sensor daisy-chaining cables</td>
                         </tr>
                         <tr>
-                            <td>Adafruit SHT30 STEMMA QT</td>
+                            <td><strong>STEMMA/QWIIC Connectors</strong></td>
+                            <td>4-pin JST SH connectors</td>
+                            <td>10</td>
+                            <td>$0.50</td>
+                            <td>$5.00</td>
+                            <td>I2C connector headers for custom boards</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Adafruit SHT30 STEMMA QT</strong></td>
                             <td>Temperature & Humidity Sensor</td>
                             <td>2</td>
                             <td>$15</td>
@@ -277,7 +322,7 @@
                             <td>High-accuracy T/H with STEMMA QT connector</td>
                         </tr>
                         <tr>
-                            <td>SparkFun SCD30 Qwiic</td>
+                            <td><strong>SparkFun SCD30 Qwiic</strong></td>
                             <td>CO₂ Sensor</td>
                             <td>2</td>
                             <td>$25</td>
@@ -285,7 +330,7 @@
                             <td>High-accuracy CO₂ detection with Qwiic connector</td>
                         </tr>
                         <tr>
-                            <td>Adafruit SGP30 STEMMA QT</td>
+                            <td><strong>Adafruit SGP30 STEMMA QT</strong></td>
                             <td>VOC Sensor</td>
                             <td>2</td>
                             <td>$15</td>
@@ -293,7 +338,7 @@
                             <td>VOC detection with humidity compensation</td>
                         </tr>
                         <tr>
-                            <td>Sensirion SPS30</td>
+                            <td><strong>Sensirion SPS30</strong></td>
                             <td>Professional PM sensor</td>
                             <td>2</td>
                             <td>$25</td>
@@ -301,7 +346,7 @@
                             <td>High-accuracy particulate matter detection</td>
                         </tr>
                         <tr>
-                            <td>Adafruit BH1750 STEMMA QT</td>
+                            <td><strong>Adafruit BH1750 STEMMA QT</strong></td>
                             <td>Light Sensor</td>
                             <td>2</td>
                             <td>$8</td>
@@ -309,7 +354,7 @@
                             <td>Ambient light measurement with 16-bit ADC</td>
                         </tr>
                         <tr>
-                            <td>4x ICS-43434 I2S Mics</td>
+                            <td><strong>4x ICS-43434 I2S Mics</strong></td>
                             <td>Professional I2S microphones</td>
                             <td>8</td>
                             <td>$3.12</td>
@@ -317,7 +362,7 @@
                             <td>High-quality 4-microphone array for far-field detection</td>
                         </tr>
                         <tr>
-                            <td>TPA3116D2 Breakout Board</td>
+                            <td><strong>TPA3116D2 Breakout Board</strong></td>
                             <td>3-10W Class-D Amplifier</td>
                             <td>2</td>
                             <td>$8</td>
@@ -325,7 +370,7 @@
                             <td>Ready-to-use amplifier with I2S input and configurable power</td>
                         </tr>
                         <tr>
-                            <td>A077 Proto Board</td>
+                            <td><strong>A077 Proto Board</strong></td>
                             <td>M5Stack ATOMIC DIY Kit</td>
                             <td>2</td>
                             <td>$3.50</td>
@@ -333,7 +378,7 @@
                             <td>Prototyping board for 4-microphone array</td>
                         </tr>
                         <tr>
-                            <td>2.5" Full-Range Drivers</td>
+                            <td><strong>2.5" Full-Range Drivers</strong></td>
                             <td>4Ω 2.5" drivers + 3" passive radiator</td>
                             <td>2</td>
                             <td>$15</td>
@@ -341,7 +386,7 @@
                             <td>Professional audio drivers (80Hz-18kHz) for high-quality sound</td>
                         </tr>
                         <tr>
-                            <td>Adafruit PCA9685 STEMMA QT</td>
+                            <td><strong>Adafruit PCA9685 STEMMA QT</strong></td>
                             <td>16-Channel PWM Driver</td>
                             <td>2</td>
                             <td>$8</td>
@@ -349,7 +394,7 @@
                             <td>I2C PWM driver for RGB LEDs</td>
                         </tr>
                         <tr>
-                            <td>RGB LEDs</td>
+                            <td><strong>RGB LEDs</strong></td>
                             <td>5mm RGB LEDs</td>
                             <td>10</td>
                             <td>$1</td>
@@ -357,7 +402,7 @@
                             <td>RGB lighting system</td>
                         </tr>
                         <tr>
-                            <td>USB-C Power Supply</td>
+                            <td><strong>USB-C Power Supply</strong></td>
                             <td>5V/2A</td>
                             <td>2</td>
                             <td>$8</td>
@@ -365,7 +410,7 @@
                             <td>Power supply for ESP32-S3</td>
                         </tr>
                         <tr>
-                            <td>USB-C to 12V PD Adapter</td>
+                            <td><strong>USB-C to 12V PD Adapter</strong></td>
                             <td>Variable 9V-24V</td>
                             <td>2</td>
                             <td>$25</td>
@@ -373,7 +418,7 @@
                             <td>12V power for TPA3116D2 amplifier</td>
                         </tr>
                         <tr>
-                            <td>4-Pin Connector (Port A)</td>
+                            <td><strong>4-Pin Connector (Port A)</strong></td>
                             <td>M5Stack Port A connector</td>
                             <td>2</td>
                             <td>$2</td>
@@ -382,16 +427,42 @@
                         </tr>
                     </tbody>
                     <tfoot>
-                        <tr style="background: #667eea; color: white; font-weight: bold;">
-                            <td colspan="4">Hardware Subtotal</td>
-                            <td colspan="2">$394.96</td>
+                        <tr>
+                            <td colspan="4"><strong>Hardware Subtotal</strong></td>
+                            <td colspan="2"><strong>$394.96</strong></td>
                         </tr>
                     </tfoot>
                 </table>
+                
+                <h3>Component Availability</h3>
+                <div class="success-box">
+                    <h4>Components Available on DigiKey:</h4>
+                    <ul>
+                        <li>✅ <strong>M5Stack Components</strong> - Atom S3R, A077 Proto Board</li>
+                        <li>✅ <strong>Sensirion SPS30</strong> - Professional PM sensor</li>
+                        <li>✅ <strong>ICS-43434 I2S Microphones</strong> - 4-microphone array</li>
+                        <li>✅ <strong>RGB LEDs</strong> - Standard RGB LEDs</li>
+                    </ul>
+                    
+                    <h4>Components Available from Adafruit:</h4>
+                    <ul>
+                        <li>✅ <strong>STEMMA QT Sensors</strong> - SHT30, SGP30, BH1750, PCA9685</li>
+                        <li>✅ <strong>STEMMA/QWIIC Cables</strong> - 4-pin JST SH cables</li>
+                        <li>✅ <strong>TPA3116D2 Breakout</strong> - 3-10W Class-D amplifier</li>
+                    </ul>
+                    
+                    <h4>Components Available from SparkFun:</h4>
+                    <ul>
+                        <li>✅ <strong>Qwiic Sensors</strong> - SCD30 CO₂ sensor</li>
+                        <li>✅ <strong>Qwiic Cables</strong> - 4-pin JST SH cables</li>
+                    </ul>
+                </div>
             </div>
             
+            <hr>
+            
             <div class="section">
-                <h2>System Architecture</h2>
+                <h2>System Architecture - Exact Pin Mappings</h2>
                 
                 <h3>ESP32-S3 Atom S3R Pin Assignments</h3>
                 <table>
@@ -405,61 +476,61 @@
                     </thead>
                     <tbody>
                         <tr>
-                            <td>I2C Master</td>
+                            <td><strong>I2C Master</strong></td>
                             <td>GPIO2</td>
                             <td>SDA</td>
                             <td>External I2C Bus (Port A)</td>
                         </tr>
                         <tr>
-                            <td>I2C Master</td>
+                            <td><strong>I2C Master</strong></td>
                             <td>GPIO1</td>
                             <td>SCL</td>
                             <td>External I2C Bus (Port A)</td>
                         </tr>
                         <tr>
-                            <td>I2S Audio</td>
+                            <td><strong>I2S Audio</strong></td>
                             <td>GPIO17</td>
                             <td>BCK</td>
                             <td>ICS-43434 Microphones, TPA3116D2 Amplifier</td>
                         </tr>
                         <tr>
-                            <td>I2S Audio</td>
+                            <td><strong>I2S Audio</strong></td>
                             <td>GPIO3</td>
                             <td>LRCK</td>
                             <td>ICS-43434 Microphones, TPA3116D2 Amplifier</td>
                         </tr>
                         <tr>
-                            <td>I2S Audio</td>
+                            <td><strong>I2S Audio</strong></td>
                             <td>GPIO48</td>
                             <td>DOUT</td>
                             <td>TPA3116D2 Amplifier</td>
                         </tr>
                         <tr>
-                            <td>I2S Audio</td>
+                            <td><strong>I2S Audio</strong></td>
                             <td>GPIO4</td>
                             <td>DIN</td>
                             <td>ICS-43434 Microphones</td>
                         </tr>
                         <tr>
-                            <td>UART</td>
+                            <td><strong>UART</strong></td>
                             <td>GPIO43</td>
                             <td>TX</td>
                             <td>SPS30 PM Sensor</td>
                         </tr>
                         <tr>
-                            <td>UART</td>
+                            <td><strong>UART</strong></td>
                             <td>GPIO44</td>
                             <td>RX</td>
                             <td>SPS30 PM Sensor</td>
                         </tr>
                         <tr>
-                            <td>GPIO</td>
+                            <td><strong>GPIO</strong></td>
                             <td>GPIO21</td>
                             <td>Data</td>
                             <td>PCA9685 RGB LED Driver</td>
                         </tr>
                         <tr>
-                            <td>GPIO</td>
+                            <td><strong>GPIO</strong></td>
                             <td>GPIO7</td>
                             <td>IR_TX</td>
                             <td>IR Transmitter (built-in)</td>
@@ -479,143 +550,248 @@
                     </thead>
                     <tbody>
                         <tr>
-                            <td>SHT30</td>
+                            <td><strong>SHT30</strong></td>
                             <td>0x44</td>
                             <td>Temperature/Humidity</td>
                             <td>SDA:GPIO2, SCL:GPIO1</td>
                         </tr>
                         <tr>
-                            <td>SGP30</td>
+                            <td><strong>SGP30</strong></td>
                             <td>0x58</td>
                             <td>VOC Sensor</td>
                             <td>SDA:GPIO2, SCL:GPIO1</td>
                         </tr>
                         <tr>
-                            <td>BH1750FVI</td>
+                            <td><strong>BH1750FVI</strong></td>
                             <td>0x23</td>
                             <td>Ambient Light</td>
                             <td>SDA:GPIO2, SCL:GPIO1</td>
                         </tr>
                         <tr>
-                            <td>SCD30</td>
+                            <td><strong>SCD30</strong></td>
                             <td>0x61</td>
                             <td>CO₂ Sensor</td>
                             <td>SDA:GPIO2, SCL:GPIO1</td>
                         </tr>
                         <tr>
-                            <td>PCA9685</td>
+                            <td><strong>PCA9685</strong></td>
                             <td>0x40</td>
                             <td>RGB LED Driver</td>
                             <td>SDA:GPIO2, SCL:GPIO1</td>
                         </tr>
                     </tbody>
                 </table>
+                
+                <h3>I2S Audio Bus Architecture</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Device</th>
+                            <th>Function</th>
+                            <th>Connection</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>4x ICS-43434</strong></td>
+                            <td>I2S Microphones</td>
+                            <td>BCK:GPIO17, LRCK:GPIO3, SD:GPIO4 (shared bus)</td>
+                        </tr>
+                        <tr>
+                            <td><strong>TPA3116D2</strong></td>
+                            <td>Configurable Amplifier</td>
+                            <td>BCK:GPIO17, LRCK:GPIO3, DIN:GPIO48</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <h3>System Block Diagram</h3>
+                <div class="diagram">               
+     NAPHOME PHASE 0.9 SYSTEM ARCHITECTURE
+                                ESP32-S3 Atom S3R
+                                    (MCU)
+                                        │
+                    ┌───────────────────┼───────────────────┐
+                    │                   │                   │
+            ┌───────▼───────┐   ┌───────▼───────┐   ┌───────▼───────┐
+            │   I2C Bus     │   │   I2S Bus     │   │   UART Bus    │
+            │  (Port A)     │   │   (Audio)     │   │   (Serial)    │
+            │               │   │               │   │               │
+            │ SDA: GPIO2    │   │ BCK: GPIO17   │   │ TX: GPIO43    │
+            │ SCL: GPIO1    │   │ LRCK: GPIO3   │   │ RX: GPIO44    │
+            └───────┬───────┘   │ DOUT: GPIO48  │   └───────┬───────┘
+                    │           │ DIN: GPIO4    │           │
+                    │           └───────┬───────┘           │
+                    │                   │                   │
+        ┌───────────▼───────────┐       │           ┌───────▼───────┐
+        │    I2C Devices        │       │           │ SPS30 PM      │
+        │                       │       │           │ Sensor        │
+        │ SHT30 (0x44)          │       │           └───────────────┘
+        │ SGP30 (0x58)          │       │
+        │ BH1750FVI (0x23)      │       │
+        │ SCD30 (0x61)          │       │
+        │ PCA9685 (0x40)        │       │
+        └───────────────────────┘       │
+                                        │
+                            ┌───────────▼───────────┐
+                            │    I2S Audio Chain    │
+                            │                       │
+                            │ 4x ICS-43434 Mics     │
+                            │ ├─ Digital I2S Input  │
+                            │ ├─ 4-Channel Array    │
+                            │ └─ Far-field Detection│
+                            │                       │
+                            │ TPA3116D2 (3-10W)     │
+                            │ ├─ I2S Input          │
+                            │ ├─ Configurable Power │
+                            │ └─ Speaker Output     │
+                            └───────────────────────┘
+
+                    ┌───────────────────┼───────────────────┐
+                    │                   │                   │
+            ┌───────▼───────┐   ┌───────▼───────┐   ┌───────▼───────┐
+            │   GPIO Bus    │   │   GPIO Bus    │   │   GPIO Bus    │
+            │   (LEDs)      │   │   (IR)        │   │   (Built-in)  │
+            │               │   │               │   │               │
+            │ GPIO21        │   │ GPIO7         │   │ 0.85" Display │
+            │ PCA9685       │   │ IR_TX         │   │ Built-in      │
+            │ RGB Driver    │   │ Transmitter   │   │               │
+            └───────────────┘   └───────────────┘   └───────────────┘</div>
             </div>
             
-            <div class="section">
-                <h2>Development Scope & Timeline</h2>
-                
-                <h3>Week 1: Hardware Integration & Basic Drivers (48 hours)</h3>
-                <ul>
-                    <li><strong>Day 1-3:</strong> Core Platform Setup
-                        <ul>
-                            <li>ESP32-S3 System Initialization (12 hours)</li>
-                            <li>STEMMA/QWIIC Sensor Integration (16 hours)</li>
-                        </ul>
-                    </li>
-                    <li><strong>Day 4-5:</strong> Audio System Setup
-                        <ul>
-                            <li>I²S Audio Configuration (12 hours)</li>
-                            <li>LED System (8 hours)</li>
-                        </ul>
-                    </li>
-                </ul>
-                
-                <h3>Week 2: WiFi & Cloud Integration (48 hours)</h3>
-                <ul>
-                    <li><strong>Day 6-8:</strong> Network Stack
-                        <ul>
-                            <li>WiFi Implementation (12 hours)</li>
-                            <li>MQTT Integration (16 hours)</li>
-                            <li>Cloud Integration (12 hours)</li>
-                        </ul>
-                    </li>
-                    <li><strong>Day 9-10:</strong> Sensor Telemetry
-                        <ul>
-                            <li>Sensor Data Publishing (8 hours)</li>
-                        </ul>
-                    </li>
-                </ul>
-                
-                <h3>Week 3: Advanced Features & Validation (40 hours)</h3>
-                <ul>
-                    <li><strong>Day 11-13:</strong> Voice & Audio
-                        <ul>
-                            <li>Wake Word Detection - ESP-SR WakeNet integration (16 hours)</li>
-                            <li>IR Blaster Control (8 hours)</li>
-                        </ul>
-                    </li>
-                    <li><strong>Day 14-15:</strong> System Integration & Testing
-                        <ul>
-                            <li>End-to-End Testing (16 hours)</li>
-                        </ul>
-                    </li>
-                </ul>
-            </div>
+            <hr>
             
             <div class="section">
-                <h2>Phase 0.9 Validation Features</h2>
+                <h2>Phase I Custom PCB Compatibility</h2>
+                <h3>Identical ICs and Pin Mappings</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Function</th>
+                            <th>Phase 0.9 (COTS)</th>
+                            <th>Phase I (Custom PCB)</th>
+                            <th>Pin Mapping</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>MCU</strong></td>
+                            <td>ESP32-S3FN8 (M5 Atom S3)</td>
+                            <td>ESP32-S3FN8</td>
+                            <td>GPIO, I2C, I2S pins identical</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Temperature/Humidity</strong></td>
+                            <td>SHT30 (STEMMA QT)</td>
+                            <td>SHT30</td>
+                            <td>I2C address 0x44</td>
+                        </tr>
+                        <tr>
+                            <td><strong>VOC/eCO2</strong></td>
+                            <td>SGP30 (STEMMA QT)</td>
+                            <td>SGP30</td>
+                            <td>I2C address 0x58</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Ambient Light</strong></td>
+                            <td>BH1750FVI (STEMMA QT)</td>
+                            <td>BH1750FVI</td>
+                            <td>I2C address 0x23</td>
+                        </tr>
+                        <tr>
+                            <td><strong>CO₂</strong></td>
+                            <td>SCD30 (Qwiic)</td>
+                            <td>SCD30</td>
+                            <td>I2C address 0x61</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Audio Amplifier</strong></td>
+                            <td>TPA3116D2</td>
+                            <td>TPA3116D2</td>
+                            <td>I2S pins identical</td>
+                        </tr>
+                        <tr>
+                            <td><strong>RGB LEDs</strong></td>
+                            <td>PCA9685 + RGB LEDs</td>
+                            <td>PCA9685 + RGB LEDs</td>
+                            <td>I2C address 0x40</td>
+                        </tr>
+                        <tr>
+                            <td><strong>IR Transmitter</strong></td>
+                            <td>Built-in (M5 Atom S3)</td>
+                            <td>External IR LED</td>
+                            <td>GPIO pin preserved</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
                 <div class="success-box">
+                    <h4>Firmware Compatibility Benefits</h4>
                     <ul>
-                        <li><span class="status-badge status-complete">✅</span> ESP32-S3 system initialization</li>
-                        <li><span class="status-badge status-complete">✅</span> STEMMA/QWIIC sensor integration (5 sensors)</li>
-                        <li><span class="status-badge status-complete">✅</span> AWS IoT Core MQTT connectivity</li>
-                        <li><span class="status-badge status-complete">✅</span> Basic wake word detection (1-2m range) - <strong>ESP-SR WakeNet</strong></li>
-                        <li><span class="status-badge status-complete">✅</span> RGB LED control via PCA9685</li>
-                        <li><span class="status-badge status-complete">✅</span> IR blaster functionality</li>
-                        <li><span class="status-badge status-complete">✅</span> Audio output system (TPA3116D2)</li>
-                        <li><span class="status-badge status-complete">✅</span> Sensor telemetry publishing</li>
-                        <li><span class="status-badge status-complete">✅</span> 4-microphone hardware setup (future use)</li>
-                        <li><span class="status-badge status-complete">✅</span> I2S audio architecture foundation</li>
+                        <li><strong>Zero code changes</strong> required for Phase I transition</li>
+                        <li><strong>Identical I2C addresses</strong> and communication protocols</li>
+                        <li><strong>Same GPIO pin assignments</strong> for all peripherals</li>
+                        <li><strong>Identical I2S audio configuration</strong> and timing</li>
+                        <li><strong>Preserved sensor calibration</strong> and algorithms</li>
+                        <li><strong>Seamless OTA update</strong> compatibility</li>
                     </ul>
                 </div>
             </div>
             
+            <hr>
+            
             <div class="section">
-                <h2>Audio Processing Scope - Phase 0.9</h2>
+                <h2>Audio Processing Limitations & Realistic Scope - Phase 0.9</h2>
+                
+                <div class="warning-box">
+                    <h3>Far-Field Audio Processing Challenges</h3>
+                    <h4>Technical Complexity</h4>
+                    <ul>
+                        <li><strong>Beamforming Algorithms:</strong> Require advanced DSP knowledge and real-time optimization</li>
+                        <li><strong>4-Microphone Array:</strong> No ready-made ESP32-S3 libraries available</li>
+                        <li><strong>Calibration Requirements:</strong> Need acoustic testing and microphone positioning optimization</li>
+                        <li><strong>Real-Time Processing:</strong> ESP32-S3 computational limits for complex audio algorithms</li>
+                        <li><strong>Integration Complexity:</strong> Custom algorithms must integrate with ESP-SR wake word detection</li>
+                    </ul>
+                    
+                    <h4>Current State of Technology</h4>
+                    <ul>
+                        <li><strong>ESP-SR Support:</strong> Only single microphone, no array support</li>
+                        <li><strong>Open Source:</strong> No free 4-mic beamforming implementations for ESP32-S3</li>
+                        <li><strong>Commercial Solutions:</strong> Expensive licensing ($5,000-$15,000) for professional algorithms</li>
+                        <li><strong>Research Level:</strong> Most implementations are academic/proprietary</li>
+                    </ul>
+                </div>
                 
                 <div class="success-box">
-                    <h4>What We WILL Deliver:</h4>
+                    <h3>What We WILL Deliver:</h3>
+                    <h4>✅ Basic Wake Word Detection</h4>
                     <ul>
-                        <li><strong>Basic Wake Word Detection</strong>
-                            <ul>
-                                <li>Single ICS-43434 microphone input</li>
-                                <li><strong>ESP-SR "Hey Naphome" wake word recognition</strong></li>
-                                <li>Local processing with cloud speech streaming</li>
-                                <li>1-2 meter effective range</li>
-                            </ul>
-                        </li>
-                        <li><strong>Audio Output System</strong>
-                            <ul>
-                                <li>TPA3116D2 amplifier integration</li>
-                                <li>I2S audio playback</li>
-                                <li>Configurable power levels (3W/5W/10W)</li>
-                                <li>Speaker output validation</li>
-                            </ul>
-                        </li>
-                        <li><strong>Audio Architecture Foundation</strong>
-                            <ul>
-                                <li>I2S bus configuration</li>
-                                <li>4-microphone hardware setup (for future use)</li>
-                                <li>Audio processing pipeline structure</li>
-                                <li>Integration with sensor telemetry</li>
-                            </ul>
-                        </li>
+                        <li>Single ICS-43434 microphone input</li>
+                        <li><strong>ESP-SR "Hey Naphome" wake word recognition</strong></li>
+                        <li>Local processing with cloud speech streaming</li>
+                        <li>1-2 meter effective range</li>
+                    </ul>
+                    
+                    <h4>✅ Audio Output System</h4>
+                    <ul>
+                        <li>TPA3116D2 amplifier integration</li>
+                        <li>I2S audio playback</li>
+                        <li>Configurable power levels (3W/5W/10W)</li>
+                        <li>Speaker output validation</li>
+                    </ul>
+                    
+                    <h4>✅ Audio Architecture Foundation</h4>
+                    <ul>
+                        <li>I2S bus configuration</li>
+                        <li>4-microphone hardware setup (for future use)</li>
+                        <li>Audio processing pipeline structure</li>
+                        <li>Integration with sensor telemetry</li>
                     </ul>
                 </div>
                 
                 <div class="warning-box">
-                    <h4>What We WON'T Deliver in Phase 0.9:</h4>
+                    <h3>What We WON'T Deliver in Phase 0.9:</h3>
                     <ul>
                         <li>❌ Far-Field Detection (4+ meters)</li>
                         <li>❌ Beamforming Algorithms</li>
@@ -624,10 +800,142 @@
                         <li>❌ Directional Audio Detection</li>
                     </ul>
                 </div>
+                
+                <h3>Audio Testing Protocol - Phase 0.9</h3>
+                <h4>Wake Word Detection Testing:</h4>
+                <ul>
+                    <li><strong>Distance Testing:</strong> 0.5m, 1m, 1.5m, 2m voice detection</li>
+                    <li><strong>Noise Testing:</strong> Background noise, music, TV interference</li>
+                    <li><strong>Accuracy Testing:</strong> "Hey Naphome" detection rates</li>
+                    <li><strong>Response Time:</strong> Wake word to system response latency</li>
+                </ul>
+                
+                <h4>Performance Targets:</h4>
+                <ul>
+                    <li><strong>Wake Word Range:</strong> 1-2 meters (realistic for single mic)</li>
+                    <li><strong>Detection Accuracy:</strong> >90% in quiet environment</li>
+                    <li><strong>Response Time:</strong> <2 seconds from wake word to audio response</li>
+                    <li><strong>Audio Quality:</strong> Clear, distortion-free output at all power levels</li>
+                </ul>
             </div>
             
+            <hr>
+            
             <div class="section">
-                <h2>Development Costs</h2>
+                <h2>Development Scope & Timeline - Phase 0.9</h2>
+                <div class="highlight-box">
+                    <p><strong>SCOPE CLARIFICATION:</strong> This Phase 0.9 development is focused exclusively on COTS validation and firmware development. It does not include any factory liaison work, manufacturing coordination, or production setup for Phase I (P1) or Phase II (P2). All deliverables are limited to a 3-week billable development timeline with a 4-week calendar allowance and the hardware components specified in this quote.</p>
+                </div>
+                
+                <h3>Week 1: Hardware Integration & Basic Drivers (48 hours)</h3>
+                <h4>Day 1-3: Core Platform Setup</h4>
+                <ul>
+                    <li><strong>ESP32-S3 System Initialization</strong> (12 hours)
+                        <ul>
+                            <li>ESP-IDF framework setup</li>
+                            <li>Memory management (8MB PSRAM utilization)</li>
+                            <li>Basic GPIO and I2C configuration</li>
+                        </ul>
+                    </li>
+                    <li><strong>STEMMA/QWIIC Sensor Integration</strong> (16 hours)
+                        <ul>
+                            <li>STEMMA/QWIIC sensor daisy-chaining</li>
+                            <li>I2C communication setup</li>
+                            <li>Sensor enumeration and testing</li>
+                        </ul>
+                    </li>
+                </ul>
+                
+                <h4>Day 4-5: Audio System Setup</h4>
+                <ul>
+                    <li><strong>I²S Audio Configuration</strong> (12 hours)
+                        <ul>
+                            <li>TPA3116D2 amplifier setup</li>
+                            <li>Basic audio playback functionality</li>
+                            <li>ICS-43434 microphone integration</li>
+                        </ul>
+                    </li>
+                    <li><strong>LED System</strong> (8 hours)
+                        <ul>
+                            <li>PCA9685 RGB LED control</li>
+                            <li>Basic lighting patterns</li>
+                            <li>Status indication system</li>
+                        </ul>
+                    </li>
+                </ul>
+                
+                <h3>Week 2: WiFi & Cloud Integration (48 hours)</h3>
+                <h4>Day 6-8: Network Stack</h4>
+                <ul>
+                    <li><strong>WiFi Implementation</strong> (12 hours)
+                        <ul>
+                            <li>Station mode configuration</li>
+                            <li>Access Point mode for setup</li>
+                            <li>Network credential management</li>
+                        </ul>
+                    </li>
+                    <li><strong>MQTT Integration</strong> (16 hours)
+                        <ul>
+                            <li>AWS IoT Core connection</li>
+                            <li>Telemetry data publishing</li>
+                            <li>Command subscription handling</li>
+                        </ul>
+                    </li>
+                    <li><strong>Cloud Integration</strong> (12 hours)
+                        <ul>
+                            <li>Port P0 functionality to ESP-IDF</li>
+                            <li>AWS IoT Core configuration</li>
+                            <li>Basic cloud communication</li>
+                        </ul>
+                    </li>
+                </ul>
+                
+                <h4>Day 9-10: Sensor Telemetry</h4>
+                <ul>
+                    <li><strong>Sensor Data Publishing</strong> (8 hours)
+                        <ul>
+                            <li>Temperature, humidity, VOC, CO₂, PM2.5, light</li>
+                            <li>Real-time data streaming</li>
+                            <li>Data validation and formatting</li>
+                        </ul>
+                    </li>
+                </ul>
+                
+                <h3>Week 3: Advanced Features & Validation (40 hours)</h3>
+                <h4>Day 11-13: Voice & Audio</h4>
+                <ul>
+                    <li><strong>Wake Word Detection</strong> (16 hours)
+                        <ul>
+                            <li><strong>ESP-SR WakeNet integration</strong></li>
+                            <li>Local wake word recognition</li>
+                            <li>Cloud-based speech streaming</li>
+                        </ul>
+                    </li>
+                    <li><strong>IR Blaster Control</strong> (8 hours)
+                        <ul>
+                            <li>IR transmitter implementation</li>
+                            <li>AC/TV control testing</li>
+                            <li>Command database validation</li>
+                        </ul>
+                    </li>
+                </ul>
+                
+                <h4>Day 14-15: System Integration & Testing</h4>
+                <ul>
+                    <li><strong>End-to-End Testing</strong> (16 hours)
+                        <ul>
+                            <li>Complete system validation</li>
+                            <li>Performance optimization</li>
+                            <li>Bug fixes and refinements</li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+            
+            <hr>
+            
+            <div class="section">
+                <h2>Development Costs - Phase 0.9</h2>
                 <table>
                     <thead>
                         <tr>
@@ -639,73 +947,119 @@
                     </thead>
                     <tbody>
                         <tr>
-                            <td>Week 1: Hardware Integration</td>
+                            <td><strong>Week 1: Hardware Integration</strong></td>
                             <td>1 week</td>
                             <td>$2,500/week</td>
                             <td>$2,500</td>
                         </tr>
                         <tr>
-                            <td>Week 2: WiFi & Cloud Integration</td>
+                            <td><strong>Week 2: WiFi & Cloud Integration</strong></td>
                             <td>1 week</td>
                             <td>$2,500/week</td>
                             <td>$2,500</td>
                         </tr>
                         <tr>
-                            <td>Week 3: Advanced Features & Validation</td>
+                            <td><strong>Week 3: Advanced Features & Validation</strong></td>
                             <td>1 week</td>
                             <td>$2,500/week</td>
                             <td>$2,500</td>
                         </tr>
                         <tr>
-                            <td>Hardware Components</td>
+                            <td><strong>Hardware Components</strong></td>
                             <td>2x Units</td>
                             <td>-</td>
                             <td>$394.96</td>
                         </tr>
                     </tbody>
                     <tfoot>
-                        <tr style="background: #667eea; color: white; font-weight: bold;">
-                            <td colspan="3">Total Project Cost</td>
-                            <td>$7,894.96</td>
+                        <tr>
+                            <td colspan="3"><strong>Total Project Cost</strong></td>
+                            <td><strong>$7,894.96</strong></td>
                         </tr>
                     </tfoot>
                 </table>
+                
+                <div class="highlight-box">
+                    <h3>Firm Fixed Price Guarantee</h3>
+                    <ul>
+                        <li><strong>Fixed Price:</strong> $7,894.96 with no additional charges for scope completion</li>
+                        <li><strong>No Change Orders:</strong> Price remains fixed regardless of technical challenges</li>
+                        <li><strong>Risk Absorption:</strong> All technical risks absorbed by contractor</li>
+                        <li><strong>Scope Completion:</strong> Full delivery of all specified features within budget</li>
+                    </ul>
+                    
+                    <h4>What's Included in Fixed Price:</h4>
+                    <ul>
+                        <li>✅ Complete Hardware Procurement - All components and test equipment</li>
+                        <li>✅ Full Firmware Development - ESP-IDF implementation with all features</li>
+                        <li>✅ System Integration - End-to-end testing and validation</li>
+                        <li>✅ Documentation - Technical specifications and user guides</li>
+                        <li>✅ Support - 30 days post-delivery support and bug fixes</li>
+                        <li>✅ Risk Mitigation - All contingency plans and fallback options</li>
+                    </ul>
+                </div>
             </div>
             
+            <hr>
+            
             <div class="section">
-                <h2>Deliverables</h2>
+                <h2>Deliverables - Phase 0.9</h2>
                 
                 <h3>Software Deliverables</h3>
                 <ul>
-                    <li>Complete Firmware Source Code (ESP-IDF based)</li>
-                    <li>STEMMA/QWIIC sensor driver implementations</li>
-                    <li>AWS IoT Core integration</li>
-                    <li>Build and deployment scripts</li>
-                    <li>MQTT telemetry publishing</li>
-                    <li>Command subscription handling</li>
-                    <li><strong>ESP-SR wake word detection integration</strong></li>
-                    <li>IR blaster control system</li>
+                    <li><strong>Complete Firmware Source Code</strong>
+                        <ul>
+                            <li>ESP-IDF based firmware</li>
+                            <li>STEMMA/QWIIC sensor driver implementations</li>
+                            <li>AWS IoT Core integration</li>
+                            <li>Build and deployment scripts</li>
+                        </ul>
+                    </li>
+                    <li><strong>Cloud Integration</strong>
+                        <ul>
+                            <li>MQTT telemetry publishing</li>
+                            <li>Command subscription handling</li>
+                            <li><strong>ESP-SR wake word detection integration</strong></li>
+                            <li>IR blaster control system</li>
+                        </ul>
+                    </li>
+                    <li><strong>Documentation</strong>
+                        <ul>
+                            <li>Phase 0.9 technical specification</li>
+                            <li>STEMMA/QWIIC sensor integration guide</li>
+                            <li>AWS IoT Core setup guide</li>
+                            <li>Validation test results</li>
+                        </ul>
+                    </li>
                 </ul>
                 
                 <h3>Hardware Deliverables</h3>
                 <ul>
-                    <li>2x Complete COTS Development Kits</li>
-                    <li>All 5 STEMMA/QWIIC sensors integrated and tested</li>
-                    <li>I²S audio system functional</li>
-                    <li>RGB LED lighting system working</li>
-                </ul>
-                
-                <h3>Documentation</h3>
-                <ul>
-                    <li>Phase 0.9 technical specification</li>
-                    <li>STEMMA/QWIIC sensor integration guide</li>
-                    <li>AWS IoT Core setup guide</li>
-                    <li>Validation test results</li>
+                    <li><strong>2x Complete COTS Development Kits</strong>
+                        <ul>
+                            <li>ESP32-S3 Atom S3R with Port A connector</li>
+                            <li>All 5 STEMMA/QWIIC sensors integrated and tested</li>
+                            <li>I²S audio system functional</li>
+                            <li>RGB LED lighting system working</li>
+                        </ul>
+                    </li>
+                    <li><strong>Validation Reports</strong>
+                        <ul>
+                            <li>Sensor accuracy vs reference measurements</li>
+                            <li>WiFi connectivity and range tests</li>
+                            <li>Audio quality validation</li>
+                            <li>Cloud integration performance metrics</li>
+                        </ul>
+                    </li>
                 </ul>
             </div>
             
+            <hr>
+            
             <div class="section">
-                <h2>Target Performance Metrics</h2>
+                <h2>Technical Specifications - Phase 0.9</h2>
+                
+                <h3>Target Performance Metrics</h3>
                 <table>
                     <thead>
                         <tr>
@@ -716,45 +1070,158 @@
                     </thead>
                     <tbody>
                         <tr>
-                            <td>Audio Quality</td>
+                            <td><strong>Audio Quality</strong></td>
                             <td>Basic I²S audio output</td>
                             <td>Audio analyzer testing</td>
                         </tr>
                         <tr>
-                            <td>Wake Word Detection</td>
+                            <td><strong>Wake Word Detection</strong></td>
                             <td>Local ESP-SR WakeNet (1-2m range)</td>
                             <td>Real-world testing</td>
                         </tr>
                         <tr>
-                            <td>Sensor Accuracy</td>
+                            <td><strong>Sensor Accuracy</strong></td>
                             <td>±5% vs reference sensors</td>
                             <td>Calibrated sensor comparison</td>
                         </tr>
                         <tr>
-                            <td>WiFi Range</td>
+                            <td><strong>WiFi Range</strong></td>
                             <td>20m+ @ 2.4GHz</td>
                             <td>RF range testing</td>
                         </tr>
                         <tr>
-                            <td>Cloud Latency</td>
+                            <td><strong>Cloud Latency</strong></td>
                             <td>&lt;2s response time</td>
                             <td>MQTT message timing</td>
                         </tr>
                         <tr>
-                            <td>Power Consumption</td>
+                            <td><strong>Power Consumption</strong></td>
                             <td>&lt;5W total system</td>
                             <td>Power measurement</td>
                         </tr>
                     </tbody>
                 </table>
+                
+                <h3>Phase 0.9 Validation Features</h3>
+                <div class="success-box">
+                    <ul>
+                        <li>✅ ESP32-S3 system initialization</li>
+                        <li>✅ STEMMA/QWIIC sensor integration (5 sensors)</li>
+                        <li>✅ AWS IoT Core MQTT connectivity</li>
+                        <li>✅ Basic wake word detection (1-2m range) - <strong>ESP-SR WakeNet</strong></li>
+                        <li>✅ RGB LED control via PCA9685</li>
+                        <li>✅ IR blaster functionality</li>
+                        <li>✅ Audio output system (TPA3116D2)</li>
+                        <li>✅ Sensor telemetry publishing</li>
+                        <li>✅ 4-microphone hardware setup (future use)</li>
+                        <li>✅ I2S audio architecture foundation</li>
+                    </ul>
+                </div>
             </div>
             
-            <div class="highlight-box">
-                <h3>Firm Fixed Price Guarantee</h3>
-                <p><strong>Fixed Price:</strong> $7,894.96 with no additional charges for scope completion</p>
-                <p><strong>No Change Orders:</strong> Price remains fixed regardless of technical challenges</p>
-                <p><strong>Risk Absorption:</strong> All technical risks absorbed by contractor</p>
-                <p><strong>Scope Completion:</strong> Full delivery of all specified features within budget</p>
+            <hr>
+            
+            <div class="section">
+                <h2>Risk Assessment & Mitigation - Phase 0.9</h2>
+                
+                <h3>Technical Risks</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Risk</th>
+                            <th>Probability</th>
+                            <th>Impact</th>
+                            <th>Mitigation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>STEMMA/QWIIC sensor compatibility</strong></td>
+                            <td>Low</td>
+                            <td>Medium</td>
+                            <td>Use proven STEMMA/QWIIC sensor modules, test early</td>
+                        </tr>
+                        <tr>
+                            <td><strong>ESP32-S3 performance</strong></td>
+                            <td>Low</td>
+                            <td>Medium</td>
+                            <td>Validate with stress testing, optimize code</td>
+                        </tr>
+                        <tr>
+                            <td><strong>AWS IoT Core integration</strong></td>
+                            <td>Low</td>
+                            <td>Low</td>
+                            <td>Use established AWS IoT patterns</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Wake word detection accuracy</strong></td>
+                            <td>Medium</td>
+                            <td>Medium</td>
+                            <td>Test with multiple voice samples</td>
+                        </tr>
+                        <tr>
+                            <td><strong>I2S TDM Implementation</strong></td>
+                            <td>High</td>
+                            <td>High</td>
+                            <td>Use single microphone initially, validate I2S bus first</td>
+                        </tr>
+                        <tr>
+                            <td><strong>ESP-SR Integration</strong></td>
+                            <td>Medium</td>
+                            <td>High</td>
+                            <td>Test ESP-SR compatibility early, have fallback plan</td>
+                        </tr>
+                    </tbody>
+                </table>
+                
+                <h3>Success Criteria & Acceptance</h3>
+                <h4>Minimum Viable Product (MVP):</h4>
+                <div class="success-box">
+                    <ul>
+                        <li>✅ ESP32-S3 system boots and runs</li>
+                        <li>✅ At least 3 sensors working (temperature, humidity, light)</li>
+                        <li>✅ Basic audio output (speaker works)</li>
+                        <li>✅ WiFi connectivity</li>
+                        <li>✅ Basic cloud communication</li>
+                    </ul>
+                </div>
+                
+                <h4>Target Deliverable:</h4>
+                <div class="success-box">
+                    <ul>
+                        <li>✅ All 5 sensors working</li>
+                        <li>✅ Wake word detection (1-2m range) - <strong>ESP-SR</strong></li>
+                        <li>✅ Audio output system</li>
+                        <li>✅ RGB LED control</li>
+                        <li>✅ IR blaster functionality</li>
+                        <li>✅ Complete sensor telemetry</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <hr>
+            
+            <div class="section">
+                <h2>Next Steps - Phase 0.9</h2>
+                <ol>
+                    <li><strong>Contract Review</strong> - Review and approve this Phase 0.9 quote</li>
+                    <li><strong>Component Ordering</strong> - Place orders for ESP32-S3 Atom S3R and STEMMA/QWIIC sensors</li>
+                    <li><strong>Development Environment Setup</strong> - Configure ESP-IDF and AWS IoT Core</li>
+                    <li><strong>Kickoff Meeting</strong> - Align on Phase 0.9 requirements and timeline</li>
+                    <li><strong>Week 1 Start</strong> - Begin hardware integration and sensor testing</li>
+                </ol>
+            </div>
+            
+            <hr>
+            
+            <div class="section" style="text-align: center; padding: 20px; background: #f8f9fa; border-radius: 10px;">
+                <p><strong>Daniel McShan</strong><br>
+                Syzygyx, Inc<br>
+                <a href="mailto:dan@syzygyx.com">dan@syzygyx.com</a></p>
+                <br>
+                <p><strong>Nadeem Shaikh</strong><br>
+                Naptick, Inc<br>
+                <a href="mailto:Nadeem@naptick.com">Nadeem@naptick.com</a></p>
             </div>
         </div>
     </div>
