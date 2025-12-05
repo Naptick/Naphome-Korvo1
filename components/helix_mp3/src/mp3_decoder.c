@@ -3,6 +3,7 @@
 #include "esp_log.h"
 #include "esp_err.h"
 #include "esp_timer.h"
+#include "esp_heap_caps.h"
 #include <string.h>
 #include <stdlib.h>
 
@@ -17,10 +18,19 @@ struct mp3_decoder {
 
 mp3_decoder_t *mp3_decoder_create(void)
 {
-    mp3_decoder_t *decoder = calloc(1, sizeof(mp3_decoder_t));
+    // Allocate decoder state in internal RAM (not PSRAM) for interrupt safety
+    // I2S DMA interrupts may access decoder state indirectly
+    mp3_decoder_t *decoder = heap_caps_malloc(sizeof(mp3_decoder_t), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     if (!decoder) {
-        ESP_LOGE(TAG, "Failed to allocate decoder");
-        return NULL;
+        // Fallback to regular malloc if internal RAM allocation fails
+        decoder = calloc(1, sizeof(mp3_decoder_t));
+        if (!decoder) {
+            ESP_LOGE(TAG, "Failed to allocate decoder");
+            return NULL;
+        }
+    } else {
+        // Zero-initialize if using heap_caps_malloc
+        memset(decoder, 0, sizeof(mp3_decoder_t));
     }
     
     mp3dec_init(&decoder->dec);

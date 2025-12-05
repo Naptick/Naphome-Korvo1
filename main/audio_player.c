@@ -672,6 +672,9 @@ static esp_err_t write_pcm_frames(const int16_t *samples, size_t sample_count, i
     ESP_RETURN_ON_FALSE(num_channels == 1 || num_channels == 2, ESP_ERR_INVALID_ARG, TAG, "channels");
 
     const size_t chunk_frames = 256;
+    // Allocate stereo buffer on stack (stack is in internal RAM, DMA-accessible)
+    // I2S DMA will copy from this buffer in task context, not interrupt context
+    // All processing happens in task context - I2S interrupt only handles DMA transfers
     int16_t stereo_buffer[chunk_frames * 2];
 
     size_t frames_written = 0;
