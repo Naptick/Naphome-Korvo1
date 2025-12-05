@@ -734,8 +734,11 @@ void app_main(void)
                     ESP_LOGI(TAG, "✅ Time synchronized: %04d-%02d-%02d %02d:%02d:%02d",
                              timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
                              timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+                    // Wait a bit longer to ensure time is fully propagated
+                    vTaskDelay(pdMS_TO_TICKS(500));
                 } else {
                     ESP_LOGW(TAG, "⚠️  Time synchronization failed - TLS certificate validation may fail");
+                    ESP_LOGW(TAG, "⚠️  HTTPS requests will use development mode (certificate verification disabled)");
                 }
                 esp_task_wdt_reset();  // Feed watchdog after time sync
                 
