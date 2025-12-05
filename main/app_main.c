@@ -713,11 +713,20 @@ void app_main(void)
                 esp_sntp_config_t sntp_config = ESP_NETIF_SNTP_DEFAULT_CONFIG("pool.ntp.org");
                 esp_netif_sntp_init(&sntp_config);
                 int retry = 0;
-                while (esp_netif_sntp_sync_wait(pdMS_TO_TICKS(5000)) != ESP_OK && retry < 3) {
+                bool time_synced = false;
+                while (retry < 3) {
+                    esp_task_wdt_reset();  // Feed watchdog before each wait
+                    esp_err_t sync_result = esp_netif_sntp_sync_wait(pdMS_TO_TICKS(5000));
+                    esp_task_wdt_reset();  // Feed watchdog after each wait
+                    
+                    if (sync_result == ESP_OK) {
+                        time_synced = true;
+                        break;
+                    }
                     ESP_LOGW(TAG, "Waiting for system time to be set... (%d/3)", retry + 1);
                     retry++;
                 }
-                if (retry < 3) {
+                if (time_synced) {
                     time_t now = 0;
                     struct tm timeinfo = {0};
                     time(&now);
@@ -729,17 +738,6 @@ void app_main(void)
                     ESP_LOGW(TAG, "⚠️  Time synchronization failed - TLS certificate validation may fail");
                 }
                 esp_task_wdt_reset();  // Feed watchdog after time sync
-                
-                // Generate and speak environmental report after WiFi connection and time sync
-                // This provides a welcome message with current conditions
-                ESP_LOGI(TAG, "Generating environmental report...");
-                esp_task_wdt_reset();  // Feed watchdog before environmental report
-                esp_err_t env_report_err = environmental_report_generate_and_speak();
-                if (env_report_err != ESP_OK) {
-                    ESP_LOGW(TAG, "Failed to generate environmental report: %s (continuing anyway)", 
-                             esp_err_to_name(env_report_err));
-                }
-                esp_task_wdt_reset();  // Feed watchdog after environmental report
                 
                 // Initialize mDNS
                 esp_err_t mdns_err = mdns_init();
@@ -821,6 +819,19 @@ void app_main(void)
                 ESP_LOGE(TAG, "Failed to start voice assistant: %s", esp_err_to_name(va_err));
             } else {
                 ESP_LOGI(TAG, "✅ Voice assistant started - ready for wake word commands");
+            
+            // Generate and speak environmental report after voice assistant is initialized
+            // This provides a welcome message with current conditions
+            ESP_LOGI(TAG, "Generating environmental report...");
+            esp_task_wdt_reset();  // Feed watchdog before environmental report
+            esp_err_t env_report_err = environmental_report_generate_and_speak();
+            if (env_report_err != ESP_OK) {
+                ESP_LOGW(TAG, "Failed to generate environmental report: %s (continuing anyway)", 
+                         esp_err_to_name(env_report_err));
+            } else {
+                ESP_LOGI(TAG, "✅ Environmental report completed");
+            }
+            esp_task_wdt_reset();  // Feed watchdog after environmental report
             }
         }
         esp_task_wdt_reset();  // Feed watchdog after voice assistant init

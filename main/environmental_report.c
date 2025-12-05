@@ -7,6 +7,7 @@
 #include "esp_http_client.h"
 #include "esp_tls.h"
 #include "esp_crt_bundle.h"
+#include "esp_task_wdt.h"
 #include "cJSON.h"
 #include "time.h"
 #include <string.h>
@@ -32,14 +33,24 @@ static esp_err_t http_event_handler(esp_http_client_event_t *evt)
 
     switch (evt->event_id) {
         case HTTP_EVENT_ON_DATA:
-            if (!esp_http_client_is_chunked_response(evt->client) && data && data->buffer) {
+            if (data && data->buffer && evt->data_len > 0) {
+                // Handle both chunked and non-chunked responses
                 size_t available = data->buffer_size - data->written - 1;
                 size_t to_copy = (evt->data_len < available) ? evt->data_len : available;
                 if (to_copy > 0) {
                     memcpy(data->buffer + data->written, evt->data, to_copy);
                     data->written += to_copy;
                     data->buffer[data->written] = '\0';
+                } else if (evt->data_len > 0) {
+                    ESP_LOGW(TAG, "Response buffer full, truncating (written=%zu, available=%zu, data_len=%zu)",
+                             data->written, available, evt->data_len);
                 }
+            }
+            break;
+        case HTTP_EVENT_ON_FINISH:
+            // Ensure null terminator
+            if (data && data->buffer && data->written < data->buffer_size) {
+                data->buffer[data->written] = '\0';
             }
             break;
         default:
@@ -61,7 +72,8 @@ esp_err_t environmental_report_fetch_weather_data(char *weather_json, size_t wea
     // Open-Meteo provides both weather and air quality in one request
     if (weather_json && weather_json_len > 0) {
         char url[512];
-        snprintf(url, sizeof(url), "%s?latitude=%s&longitude=%s&hourly=temperature_2m,relative_humidity_2m,pm2_5,pm10,ozone&current=temperature_2m,relative_humidity_2m,pm2_5,pm10,ozone",
+        // Use the endpoint format provided by user
+        snprintf(url, sizeof(url), "%s?latitude=%s&longitude=%s&hourly=temperature_2m,relative_humidity_2m,pm2_5,pm10,ozone",
                  OPEN_METEO_BASE_URL, OPEN_METEO_LAT, OPEN_METEO_LON);
 
         http_response_data_t response_data = {
@@ -84,7 +96,9 @@ esp_err_t environmental_report_fetch_weather_data(char *weather_json, size_t wea
             ESP_LOGE(TAG, "Failed to initialize HTTP client for weather/air quality");
             ret = ESP_ERR_NO_MEM;
         } else {
+            esp_task_wdt_reset();  // Feed watchdog before HTTP request
             esp_err_t http_ret = esp_http_client_perform(client);
+            esp_task_wdt_reset();  // Feed watchdog after HTTP request
             if (http_ret == ESP_OK) {
                 int status_code = esp_http_client_get_status_code(client);
                 if (status_code == 200) {
@@ -150,26 +164,35 @@ static void format_weather_summary(char *buffer, size_t buffer_len, const char *
         return;
     }
 
-    // Open-Meteo format: current.temperature_2m, current.relative_humidity_2m
-    cJSON *current = cJSON_GetObjectItem(json, "current");
-    if (current) {
-        cJSON *temp_item = cJSON_GetObjectItem(current, "temperature_2m");
-        cJSON *humidity_item = cJSON_GetObjectItem(current, "relative_humidity_2m");
+    // Open-Meteo format: hourly array with temperature_2m, relative_humidity_2m
+    // Get first hour (current) from hourly array
+    cJSON *hourly = cJSON_GetObjectItem(json, "hourly");
+    if (hourly) {
+        cJSON *time_array = cJSON_GetObjectItem(hourly, "time");
+        cJSON *temp_array = cJSON_GetObjectItem(hourly, "temperature_2m");
+        cJSON *humidity_array = cJSON_GetObjectItem(hourly, "relative_humidity_2m");
         
-        if (temp_item && humidity_item) {
-            double temp = temp_item->valuedouble;
-            double humidity = humidity_item->valuedouble;
+        if (temp_array && humidity_array && cJSON_IsArray(temp_array) && cJSON_IsArray(humidity_array)) {
+            cJSON *temp_item = cJSON_GetArrayItem(temp_array, 0);
+            cJSON *humidity_item = cJSON_GetArrayItem(humidity_array, 0);
+            
+            if (temp_item && humidity_item && cJSON_IsNumber(temp_item) && cJSON_IsNumber(humidity_item)) {
+                double temp = temp_item->valuedouble;
+                double humidity = humidity_item->valuedouble;
 
-            snprintf(buffer, buffer_len,
-                     "Outdoor Weather:\n"
-                     "- Temperature: %.1f°C (%.1f°F)\n"
-                     "- Humidity: %.0f%%",
-                     temp, temp * 9.0 / 5.0 + 32.0, humidity);
+                snprintf(buffer, buffer_len,
+                         "Outdoor Weather:\n"
+                         "- Temperature: %.1f°C (%.1f°F)\n"
+                         "- Humidity: %.0f%%",
+                         temp, temp * 9.0 / 5.0 + 32.0, humidity);
+            } else {
+                snprintf(buffer, buffer_len, "Weather data incomplete (missing values)");
+            }
         } else {
-            snprintf(buffer, buffer_len, "Weather data incomplete");
+            snprintf(buffer, buffer_len, "Weather data incomplete (missing arrays)");
         }
     } else {
-        snprintf(buffer, buffer_len, "Weather data unavailable");
+        snprintf(buffer, buffer_len, "Weather data unavailable (no hourly data)");
     }
 
     cJSON_Delete(json);
@@ -188,50 +211,59 @@ static void format_air_quality_summary(char *buffer, size_t buffer_len, const ch
         return;
     }
 
-    // Open-Meteo format: current.pm2_5, current.pm10, current.ozone
-    cJSON *current = cJSON_GetObjectItem(json, "current");
-    if (current) {
-        cJSON *pm2_5_item = cJSON_GetObjectItem(current, "pm2_5");
-        cJSON *pm10_item = cJSON_GetObjectItem(current, "pm10");
-        cJSON *ozone_item = cJSON_GetObjectItem(current, "ozone");
+    // Open-Meteo format: hourly array with pm2_5, pm10, ozone
+    // Get first hour (current) from hourly array
+    cJSON *hourly = cJSON_GetObjectItem(json, "hourly");
+    if (hourly) {
+        cJSON *pm2_5_array = cJSON_GetObjectItem(hourly, "pm2_5");
+        cJSON *pm10_array = cJSON_GetObjectItem(hourly, "pm10");
+        cJSON *ozone_array = cJSON_GetObjectItem(hourly, "ozone");
 
-        if (pm2_5_item && pm10_item) {
-            double pm2_5 = pm2_5_item->valuedouble;
-            double pm10 = pm10_item->valuedouble;
-            double ozone = ozone_item ? ozone_item->valuedouble : 0.0;
+        if (pm2_5_array && pm10_array && cJSON_IsArray(pm2_5_array) && cJSON_IsArray(pm10_array)) {
+            cJSON *pm2_5_item = cJSON_GetArrayItem(pm2_5_array, 0);
+            cJSON *pm10_item = cJSON_GetArrayItem(pm10_array, 0);
+            cJSON *ozone_item = ozone_array && cJSON_IsArray(ozone_array) ? cJSON_GetArrayItem(ozone_array, 0) : NULL;
 
-            // Calculate AQI from PM2.5 (simplified US AQI)
-            int aqi = 0;
-            const char *aqi_str = "Unknown";
-            if (pm2_5 <= 12.0) {
-                aqi = 1 + (int)((pm2_5 / 12.0) * 50);
-                aqi_str = "Good";
-            } else if (pm2_5 <= 35.4) {
-                aqi = 51 + (int)(((pm2_5 - 12.0) / 23.4) * 49);
-                aqi_str = "Moderate";
-            } else if (pm2_5 <= 55.4) {
-                aqi = 101 + (int)(((pm2_5 - 35.4) / 20.0) * 49);
-                aqi_str = "Unhealthy for Sensitive Groups";
-            } else if (pm2_5 <= 150.4) {
-                aqi = 151 + (int)(((pm2_5 - 55.4) / 95.0) * 49);
-                aqi_str = "Unhealthy";
+            if (pm2_5_item && pm10_item && cJSON_IsNumber(pm2_5_item) && cJSON_IsNumber(pm10_item)) {
+                double pm2_5 = pm2_5_item->valuedouble;
+                double pm10 = pm10_item->valuedouble;
+                double ozone = (ozone_item && cJSON_IsNumber(ozone_item)) ? ozone_item->valuedouble : 0.0;
+
+                // Calculate AQI from PM2.5 (simplified US AQI)
+                int aqi = 0;
+                const char *aqi_str = "Unknown";
+                if (pm2_5 <= 12.0) {
+                    aqi = 1 + (int)((pm2_5 / 12.0) * 50);
+                    aqi_str = "Good";
+                } else if (pm2_5 <= 35.4) {
+                    aqi = 51 + (int)(((pm2_5 - 12.0) / 23.4) * 49);
+                    aqi_str = "Moderate";
+                } else if (pm2_5 <= 55.4) {
+                    aqi = 101 + (int)(((pm2_5 - 35.4) / 20.0) * 49);
+                    aqi_str = "Unhealthy for Sensitive Groups";
+                } else if (pm2_5 <= 150.4) {
+                    aqi = 151 + (int)(((pm2_5 - 55.4) / 95.0) * 49);
+                    aqi_str = "Unhealthy";
+                } else {
+                    aqi = 201;
+                    aqi_str = "Very Unhealthy";
+                }
+
+                snprintf(buffer, buffer_len,
+                         "Outdoor Air Quality:\n"
+                         "- AQI: %d (%s)\n"
+                         "- PM2.5: %.1f μg/m³\n"
+                         "- PM10: %.1f μg/m³\n"
+                         "- Ozone: %.1f μg/m³",
+                         aqi, aqi_str, pm2_5, pm10, ozone);
             } else {
-                aqi = 201;
-                aqi_str = "Very Unhealthy";
+                snprintf(buffer, buffer_len, "Air quality data incomplete (missing values)");
             }
-
-            snprintf(buffer, buffer_len,
-                     "Outdoor Air Quality:\n"
-                     "- AQI: %d (%s)\n"
-                     "- PM2.5: %.1f μg/m³\n"
-                     "- PM10: %.1f μg/m³\n"
-                     "- Ozone: %.1f μg/m³",
-                     aqi, aqi_str, pm2_5, pm10, ozone);
         } else {
-            snprintf(buffer, buffer_len, "Air quality data incomplete");
+            snprintf(buffer, buffer_len, "Air quality data incomplete (missing arrays)");
         }
     } else {
-        snprintf(buffer, buffer_len, "Air quality data unavailable");
+        snprintf(buffer, buffer_len, "Air quality data unavailable (no hourly data)");
     }
 
     cJSON_Delete(json);
@@ -283,12 +315,21 @@ esp_err_t environmental_report_generate_and_speak(void)
              time_str, sensor_str, weather_str, air_quality_str);
 
     ESP_LOGI(TAG, "Sending prompt to LLM...");
+    esp_task_wdt_reset();  // Feed watchdog before LLM call
+
+    // Wait a moment to ensure Gemini API is fully initialized
+    // voice_assistant_start() initializes the API, but there might be a brief delay
+    vTaskDelay(pdMS_TO_TICKS(500));
 
     // Get LLM response
     char llm_response[512];
     esp_err_t ret = gemini_llm(prompt, llm_response, sizeof(llm_response));
+    esp_task_wdt_reset();  // Feed watchdog after LLM call
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to get LLM response: %s", esp_err_to_name(ret));
+        if (ret == ESP_ERR_INVALID_STATE) {
+            ESP_LOGE(TAG, "Gemini API not initialized - voice assistant may not be ready yet");
+        }
         return ret;
     }
 
