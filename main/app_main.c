@@ -513,18 +513,21 @@ void app_main(void)
     // Use lower frequency for better compatibility with slower cards
     host.max_freq_khz = SDMMC_FREQ_PROBING;  // Start with probing frequency (400kHz)
     
-    // Configure SDMMC slot with explicit GPIO pins
-    // NOTE: GPIO2 is used for I2C SCL, so we need different pins for SDMMC
-    // Common SDMMC pins for ESP32-S3: CLK=GPIO14, CMD=GPIO15, D0=GPIO2
-    // But since GPIO2 conflicts with I2C, check your hardware schematic
-    // For now, try default pins but with explicit configuration
+    // Configure SDMMC slot with explicit GPIO pins for Korvo1 hardware
+    // Hardware pinout: CLK=GPIO18 (ESP0_SD_CLK)
+    // Using 1-bit mode, so we need: CLK, CMD, and D0
+    // Common ESP32-S3 SDMMC pins: CMD=GPIO15, D0=GPIO2 (but GPIO2 conflicts with I2C SCL)
+    // For now, use GPIO18 for CLK and defaults for others, but we may need to adjust CMD and D0
     sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
     
-    // If default pins conflict, you may need to set explicit pins:
-    // slot_config.clk = GPIO_NUM_14;
-    // slot_config.cmd = GPIO_NUM_15;
-    // slot_config.d0 = GPIO_NUM_2;  // WARNING: Conflicts with I2C SCL!
-    // slot_config.width = 1;  // 1-bit mode
+    // Override CLK pin to match Korvo1 hardware (ESP0_SD_CLK = GPIO18)
+    slot_config.clk = GPIO_NUM_18;
+    
+    // Keep default CMD and D0 for now, but these may need adjustment
+    // If you know the other pins, update them here:
+    // slot_config.cmd = GPIO_NUM_XX;  // ESP0_SD_CMD
+    // slot_config.d0 = GPIO_NUM_XX;   // ESP0_SD_D0 (must not conflict with I2C SCL on GPIO2)
+    slot_config.width = 1;  // 1-bit mode
     
     // Add pull-up configuration for better signal integrity
     slot_config.gpio_cd = GPIO_NUM_NC;  // No card detect pin
