@@ -302,6 +302,12 @@
                         <li>Volume control</li>
                         <li>Play/pause functionality</li>
                     </ul>
+                    <div style="background: #ffebee; padding: 12px; border-radius: 5px; margin-top: 15px; border-left: 3px solid #d32f2f;">
+                        <p style="font-size: 0.9em; color: #c62828; margin: 0; font-weight: bold;">
+                            ⚠️ Known Issue: I2S DMA interrupt handler crash when playing MP3 from SD card. 
+                            Playback works fine from PSRAM. Investigation in progress.
+                        </p>
+                    </div>
                 </div>
                 
                 <div class="feature-card">
@@ -480,23 +486,24 @@
                 <p style="text-align: center; color: #666; margin-bottom: 20px; font-size: 1.1em;">
                     Feature-by-feature status with color-coded cards: <span style="color: #2e7d32; font-weight: bold;">✅ Green = Complete</span>, 
                     <span style="color: #f57c00; font-weight: bold;">🟡 Yellow = In Progress</span>, 
+                    <span style="color: #1976d2; font-weight: bold;">🔵 Blue = Not in Phase 0.9 Spec (Working)</span>, 
                     <span style="color: #d32f2f; font-weight: bold;">❌ Red = Out of Scope</span>
                 </p>
                 <p style="text-align: center; color: #667eea; margin-bottom: 20px; font-size: 1em;">
                     📄 <a href="phase-0.9-spec.html" style="color: #667eea; text-decoration: underline;">View Complete Phase 0.9 Specification Document</a>
                 </p>
-                <div style="background: #fff3e0; border: 2px solid #f57c00; border-radius: 10px; padding: 20px; margin-bottom: 30px;">
-                    <h3 style="color: #f57c00; font-size: 1.3em; margin-bottom: 10px;">⚠️ Not Part of Phase 0.9 Specification</h3>
+                <div style="background: #e3f2fd; border: 2px solid #1976d2; border-radius: 10px; padding: 20px; margin-bottom: 30px;">
+                    <h3 style="color: #1976d2; font-size: 1.3em; margin-bottom: 10px;">🔵 Not Part of Phase 0.9 Specification (But Working)</h3>
                     <p style="color: #666; margin-bottom: 10px;">
-                        The following technologies are <strong>not specified in the Phase 0.9 proposal</strong> but are being implemented in the current codebase:
+                        The following technologies are <strong>not specified in the Phase 0.9 proposal</strong> but are <strong>implemented and working</strong> in the current codebase:
                     </p>
                     <ul style="color: #666; margin-left: 20px; line-height: 1.8;">
-                        <li><strong>Google Gemini API</strong> - LLM, STT, and TTS services are implemented but not part of Phase 0.9 specification. Currently working on TLS/certificate issues.</li>
-                        <li><strong>Korvo1 Hardware Platform</strong> - Current implementation targets Korvo1 board, but Phase 0.9 specification targets M5Stack Atom S3R</li>
-                        <li><strong>OpenWakeWord</strong> - OpenWakeWord is implemented but not in Phase 0.9 spec. Phase 0.9 specification calls for ESP-SR WakeNet instead. Currently training custom "Hey Nap" model - dependency management (PyTorch/ONNX/TensorFlow/TFLite) is very problematic.</li>
+                        <li><strong>Google Gemini API</strong> - LLM, STT, and TTS services are implemented and working. Some TLS/certificate issues in development mode, but core functionality is operational.</li>
+                        <li><strong>Korvo1 Hardware Platform</strong> - Current implementation targets Korvo1 board (functional and working), but Phase 0.9 specification targets M5Stack Atom S3R</li>
+                        <li><strong>OpenWakeWord</strong> - OpenWakeWord is implemented and working but not in Phase 0.9 spec. Phase 0.9 specification calls for ESP-SR WakeNet instead. Currently training custom "Hey Nap" model - dependency management (PyTorch/ONNX/TensorFlow/TFLite) is very problematic.</li>
                     </ul>
                     <p style="color: #666; margin-top: 10px; font-size: 0.9em;">
-                        <strong>Note:</strong> These features are actively being developed but may not be fully functional yet. They represent enhancements beyond the Phase 0.9 scope.
+                        <strong>Note:</strong> These features are <strong>functional and working</strong> but represent enhancements beyond the Phase 0.9 scope. They are marked with 🔵 blue cards to distinguish them from in-progress (🟡 yellow) or out-of-scope (❌ red) features.
                     </p>
                 </div>
                 
@@ -518,14 +525,14 @@
                         </div>
                     </div>
                     
-                    <!-- Korvo1 Hardware - NOT IN PHASE 0.9 SPEC -->
-                    <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border: 3px solid #f57c00;">
+                    <!-- Korvo1 Hardware - NOT IN PHASE 0.9 SPEC BUT WORKING -->
+                    <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border: 3px solid #1976d2;">
                         <div style="display: flex; align-items: center; margin-bottom: 15px;">
-                            <span style="font-size: 1.5em; margin-right: 10px;">🟡</span>
-                            <h3 style="color: #f57c00; font-size: 1.3em; margin: 0;">Korvo1 Hardware</h3>
+                            <span style="font-size: 1.5em; margin-right: 10px;">🔵</span>
+                            <h3 style="color: #1976d2; font-size: 1.3em; margin: 0;">Korvo1 Hardware</h3>
                         </div>
                         <div style="color: #666; line-height: 1.8;">
-                            <p><strong>Status:</strong> <span style="color: #f57c00;">Implemented (Not in Phase 0.9 Spec)</span></p>
+                            <p><strong>Status:</strong> <span style="color: #1976d2;">Not in Phase 0.9 Spec (Working)</span></p>
                             <p style="font-size: 0.9em; color: #999; margin-top: 10px;">
                                 Current implementation targets Korvo1 board, but Phase 0.9 specification targets M5Stack Atom S3R platform. 
                                 Korvo1 implementation is functional and working.
@@ -574,6 +581,11 @@
                             <p><strong>Status:</strong> <span style="color: #2e7d32;">Complete</span></p>
                             <p><strong>Phase 0.9:</strong> TPA3116D2 amplifier</p>
                             <p><strong>Phase 0.9:</strong> Basic audio playback</p>
+                            <div style="background: #ffebee; padding: 10px; border-radius: 5px; margin-top: 10px; border-left: 3px solid #d32f2f;">
+                                <p style="font-size: 0.85em; color: #c62828; margin: 0;">
+                                    ⚠️ <strong>Known Issue:</strong> I2S DMA crash when playing MP3 from SD card. PSRAM playback works.
+                                </p>
+                            </div>
                         </div>
                     </div>
                     
@@ -712,10 +724,10 @@
                                 <div style="color: #555; margin-top: 5px; font-weight: bold;">In Progress</div>
                                 <div style="color: #666; margin-top: 5px; font-size: 0.9em;">Cloud integration</div>
                             </div>
-                            <div style="text-align: center; padding: 20px; background: #fff3e0; border-radius: 8px; border: 3px solid #f57c00;">
-                                <div style="font-size: 2.5em; font-weight: bold; color: #f57c00;">🟡</div>
-                                <div style="color: #555; margin-top: 5px; font-weight: bold;">Not in Phase 0.9 Spec</div>
-                                <div style="color: #666; margin-top: 5px; font-size: 0.9em;">Gemini, Korvo1, OpenWakeWord (implemented but not in spec)</div>
+                            <div style="text-align: center; padding: 20px; background: #e3f2fd; border-radius: 8px; border: 3px solid #1976d2;">
+                                <div style="font-size: 2.5em; font-weight: bold; color: #1976d2;">🔵</div>
+                                <div style="color: #555; margin-top: 5px; font-weight: bold;">Not in Phase 0.9 Spec (Working)</div>
+                                <div style="color: #666; margin-top: 5px; font-size: 0.9em;">Gemini, Korvo1, OpenWakeWord (working but not in spec)</div>
                             </div>
                         </div>
                     </div>
@@ -783,6 +795,30 @@
                         </div>
                     </div>
                     
+                    <!-- Known Issues Section -->
+                    <div style="grid-column: 1 / -1; background: #ffebee; padding: 20px; border-radius: 10px; margin-top: 20px; border-left: 4px solid #d32f2f;">
+                        <h3 style="color: #d32f2f; font-size: 1.3em; margin-bottom: 15px;">⚠️ Known Issues</h3>
+                        <div style="color: #666; line-height: 1.8;">
+                            <div style="margin-bottom: 15px; padding: 15px; background: white; border-radius: 5px; border-left: 3px solid #d32f2f;">
+                                <h4 style="color: #d32f2f; margin-bottom: 10px; font-size: 1.1em;">I2S DMA Interrupt Handler Crash - MP3 Playback from SD Card</h4>
+                                <p style="margin-bottom: 8px;">
+                                    <strong>Issue:</strong> System crashes in the I2S DMA interrupt handler when playing MP3 files from SD card.
+                                </p>
+                                <p style="margin-bottom: 8px;">
+                                    <strong>Status:</strong> Active investigation in progress. Playback from PSRAM works correctly.
+                                </p>
+                                <p style="margin-bottom: 8px;">
+                                    <strong>Workaround:</strong> Use PSRAM-based audio files or SPIFFS storage for MP3 playback until resolved.
+                                </p>
+                                <p style="margin-bottom: 0; font-size: 0.9em; color: #999;">
+                                    <strong>Technical Details:</strong> The crash occurs in the I2S DMA interrupt context, likely due to memory access conflicts 
+                                    between SD card read operations and I2S DMA buffer management. Recent optimizations (32KB MP3 buffer, 16KB file buffer, 
+                                    pre-fill strategy) have been implemented but the issue persists.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- Runtime Status Note -->
                     <div style="grid-column: 1 / -1; background: #e3f2fd; padding: 20px; border-radius: 10px; margin-top: 20px; border-left: 4px solid #1976d2;">
                         <h3 style="color: #1976d2; font-size: 1.3em; margin-bottom: 15px;">📝 Phase 0.9 Scope Clarification</h3>
@@ -793,8 +829,8 @@
                         <ul style="color: #666; margin-top: 10px; margin-left: 20px; line-height: 1.8;">
                             <li><strong>In Scope:</strong> M5Stack Atom S3R hardware, sensor integration (SHT30, SGP30, BH1750, SCD30, SPS30), 
                             basic audio I/O (ICS-43434 mics, TPA3116D2 amp), WiFi connectivity, AWS IoT Core MQTT integration</li>
-                            <li><strong>Not in Phase 0.9 Spec (but implemented):</strong> Google Gemini API (LLM/STT/TTS), Korvo1 hardware platform, OpenWakeWord. 
-                            These features are implemented and functional but not part of the Phase 0.9 specification. Phase 0.9 spec calls for ESP-SR (not OpenWakeWord) and M5Stack Atom S3R (not Korvo1).</li>
+                            <li><strong>Not in Phase 0.9 Spec (but working):</strong> Google Gemini API (LLM/STT/TTS), Korvo1 hardware platform, OpenWakeWord. 
+                            These features are implemented, functional, and working but not part of the Phase 0.9 specification. Phase 0.9 spec calls for ESP-SR (not OpenWakeWord) and M5Stack Atom S3R (not Korvo1). Marked with 🔵 blue cards.</li>
                         </ul>
                     </div>
                 </div>
