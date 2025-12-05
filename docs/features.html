@@ -262,10 +262,13 @@
                     <ul class="feature-list">
                         <li>OpenWakeWord integration</li>
                         <li>Low-power always-on listening</li>
-                        <li>Custom wake word support</li>
+                        <li>Custom wake word support ("Hey Nap" model in training)</li>
                         <li>Multi-microphone support (ES7210)</li>
                         <li>Automatic pause during playback</li>
                     </ul>
+                    <p style="font-size: 0.9em; color: #f57c00; margin-top: 10px; font-style: italic;">
+                        ⚠️ Model training has dependency management challenges (PyTorch/ONNX/TensorFlow/TFLite conversion chain)
+                    </p>
                 </div>
                 
                 <div class="feature-card">
@@ -490,7 +493,7 @@
                     <ul style="color: #666; margin-left: 20px; line-height: 1.8;">
                         <li><strong>Google Gemini API</strong> - LLM, STT, and TTS services are implemented but not part of Phase 0.9 specification. Currently working on TLS/certificate issues.</li>
                         <li><strong>Korvo1 Hardware Platform</strong> - Current implementation targets Korvo1 board, but Phase 0.9 specification targets M5Stack Atom S3R</li>
-                        <li><strong>OpenWakeWord</strong> - OpenWakeWord is implemented but not in Phase 0.9 spec. Phase 0.9 specification calls for ESP-SR WakeNet instead.</li>
+                        <li><strong>OpenWakeWord</strong> - OpenWakeWord is implemented but not in Phase 0.9 spec. Phase 0.9 specification calls for ESP-SR WakeNet instead. Currently training custom "Hey Nap" model - dependency management (PyTorch/ONNX/TensorFlow/TFLite) is very problematic.</li>
                     </ul>
                     <p style="color: #666; margin-top: 10px; font-size: 0.9em;">
                         <strong>Note:</strong> These features are actively being developed but may not be fully functional yet. They represent enhancements beyond the Phase 0.9 scope.
@@ -584,6 +587,13 @@
                             <p><strong>Status:</strong> <span style="color: #f57c00;">In Progress / Needs Demo</span></p>
                             <p><strong>Phase 0.9 Spec:</strong> ESP-SR WakeNet integration (1-2m range)</p>
                             <p><strong>Current Implementation:</strong> OpenWakeWord (not in Phase 0.9 spec, but implemented)</p>
+                            <div style="background: #fff3e0; padding: 12px; border-radius: 5px; margin-top: 10px; border-left: 3px solid #f57c00;">
+                                <p style="font-size: 0.9em; color: #666; margin: 0;">
+                                    <strong>⚠️ Model Training:</strong> Currently training a custom "Hey Nap" model for OpenWakeWord. 
+                                    The training process is very problematic due to complex dependency management issues (PyTorch, ONNX, TensorFlow, TFLite conversion chain). 
+                                    Dependency conflicts and version incompatibilities make the training pipeline difficult to set up and maintain.
+                                </p>
+                            </div>
                             <p style="font-size: 0.9em; color: #999; margin-top: 10px;">
                                 <strong>Note:</strong> Phase 0.9 specification calls for ESP-SR "Hey Naphome" wake word recognition. 
                                 Current codebase implements OpenWakeWord instead, which is functional but not in the Phase 0.9 spec.
@@ -754,7 +764,7 @@
                                 <ul style="color: #666; line-height: 1.8; font-size: 0.95em;">
                                     <li><strong>Google Gemini API</strong> - LLM, STT, TTS services</li>
                                     <li><strong>Korvo1 hardware</strong> - Phase 0.9 targets M5Stack Atom S3R</li>
-                                    <li><strong>OpenWakeWord</strong> - Implemented but not in Phase 0.9 spec (spec calls for ESP-SR)</li>
+                                    <li><strong>OpenWakeWord</strong> - Implemented but not in Phase 0.9 spec (spec calls for ESP-SR). Custom model training in progress - dependency issues with PyTorch/ONNX/TensorFlow/TFLite conversion chain.</li>
                                     <li><strong>Voice assistant</strong> - Full STT-LLM-TTS pipeline</li>
                                     <li><strong>Advanced audio processing</strong> - Beyond basic I/O</li>
                                     <li><strong>BLE provisioning</strong> - Not in Phase 0.9 scope</li>

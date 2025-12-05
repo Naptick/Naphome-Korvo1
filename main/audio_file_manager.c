@@ -460,17 +460,24 @@ static void mp3_playback_task(void *arg)
     ESP_LOGI(TAG, "MP3 decoder created successfully");
 
     // Allocate buffers
-    const size_t mp3_buffer_size = 4096;
+    // Increase MP3 buffer size to reduce SD card read frequency
+    const size_t mp3_buffer_size = 8192;  // Increased from 4096 to reduce SD card reads
     const size_t pcm_buffer_size = 1152 * 2 * sizeof(int16_t);
     
-    // Prefer PSRAM for audio buffers to preserve internal RAM for TLS
+    // MP3 buffer can be in PSRAM (only accessed from task, not from interrupt)
     uint8_t *mp3_buffer = heap_caps_malloc(mp3_buffer_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!mp3_buffer) {
         mp3_buffer = malloc(mp3_buffer_size);
     }
-    int16_t *pcm_buffer = heap_caps_malloc(pcm_buffer_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    
+    // PCM buffer MUST be in internal RAM (DMA-capable) for I2S
+    // I2S DMA interrupt only accesses I2S driver's internal buffers, not this buffer
+    // This buffer is only accessed in task context
+    int16_t *pcm_buffer = heap_caps_malloc(pcm_buffer_size, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
     if (!pcm_buffer) {
+        // Fallback to regular malloc if DMA-capable allocation fails
         pcm_buffer = malloc(pcm_buffer_size);
+        ESP_LOGW(TAG, "PCM buffer not in DMA-capable memory - may cause issues");
     }
     
     if (!mp3_buffer || !pcm_buffer) {
@@ -504,14 +511,26 @@ static void mp3_playback_task(void *arg)
                 break;
             }
         }
-        // Read MP3 data
+        // Read MP3 data from SD card
+        // Yield periodically during SD card reads to prevent blocking I2S DMA
         if (bytes_read < mp3_buffer_size) {
             size_t to_read = mp3_buffer_size - bytes_read;
-            size_t read = fread(mp3_buffer + bytes_read, 1, to_read, fp);
-            if (read < to_read) {
-                eof = true;
+            // Read in smaller chunks to avoid long blocking SD card operations
+            const size_t chunk_size = 1024;  // Read 1KB at a time
+            size_t total_read = 0;
+            while (total_read < to_read && !eof) {
+                size_t this_read = (to_read - total_read > chunk_size) ? chunk_size : (to_read - total_read);
+                size_t read = fread(mp3_buffer + bytes_read + total_read, 1, this_read, fp);
+                if (read < this_read) {
+                    eof = true;
+                }
+                total_read += read;
+                // Yield after each chunk to allow I2S DMA to continue
+                if (total_read < to_read && !eof) {
+                    vTaskDelay(pdMS_TO_TICKS(1));  // Yield to I2S DMA
+                }
             }
-            bytes_read += read;
+            bytes_read += total_read;
         }
 
         if (bytes_read == 0) {
@@ -545,7 +564,8 @@ static void mp3_playback_task(void *arg)
                 ESP_LOGI(TAG, "MP3 playback progress: %d frames decoded", frame_count);
             }
 
-            // Submit PCM to audio player
+            // Submit PCM to audio player (all processing happens in task context, not interrupt)
+            // The audio player will copy data to I2S DMA buffers in task context
             err = audio_player_submit_pcm(pcm_buffer, samples_decoded / channels,
                                          sample_rate, channels);
             if (err != ESP_OK) {
@@ -571,7 +591,9 @@ static void mp3_playback_task(void *arg)
             }
         }
 
-        vTaskDelay(pdMS_TO_TICKS(10));
+        // Yield to allow I2S DMA and other tasks to run
+        // This prevents SD card reads from blocking I2S DMA operations
+        vTaskDelay(pdMS_TO_TICKS(5));  // Reduced from 10ms to be more responsive
     }
 
     // Cleanup
