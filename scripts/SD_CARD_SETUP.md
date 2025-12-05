@@ -23,13 +23,12 @@ The Korvo1 supports SD cards via:
 - **SDMMC mode** (1-bit mode, preferred): Uses dedicated SDMMC pins
 - **SPI mode** (fallback): Uses SPI pins if SDMMC is not available
 
-### SDMMC Pin Configuration (Default)
-- CLK: GPIO14
-- CMD: GPIO15  
-- D0: GPIO2
-- D1: GPIO4 (optional, for 4-bit mode)
-- D2: GPIO12 (optional, for 4-bit mode)
-- D3: GPIO13 (optional, for 4-bit mode)
+### SDMMC Pin Configuration (Korvo1 Hardware)
+- CLK: GPIO18 (ESP0_SD_CLK)
+- CMD: GPIO17 (ESP0_SD_CMD)
+- DAT0: GPIO16 (ESP0_SD_DAT0)
+- DAT3: GPIO15 (ESP0_SD_DAT3)
+- DET: GPIO7 (ESP0_SD_DET - card detect)
 
 ### SPI Mode Pin Configuration (Fallback)
 - MOSI: GPIO11

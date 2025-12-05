@@ -514,24 +514,20 @@ void app_main(void)
     host.max_freq_khz = SDMMC_FREQ_PROBING;  // Start with probing frequency (400kHz)
     
     // Configure SDMMC slot with explicit GPIO pins for Korvo1 hardware
-    // Hardware pinout: CLK=GPIO18 (ESP0_SD_CLK)
-    // Using 1-bit mode, so we need: CLK, CMD, and D0
-    // Common ESP32-S3 SDMMC pins: CMD=GPIO15, D0=GPIO2 (but GPIO2 conflicts with I2C SCL)
-    // For now, use GPIO18 for CLK and defaults for others, but we may need to adjust CMD and D0
+    // Hardware pinout from Korvo GitHub repository:
+    // CLK=GPIO18, CMD=GPIO17, DAT0=GPIO16, DAT3=GPIO15, DET=GPIO7
     sdmmc_slot_config_t slot_config = SDMMC_SLOT_CONFIG_DEFAULT();
     
-    // Override CLK pin to match Korvo1 hardware (ESP0_SD_CLK = GPIO18)
-    slot_config.clk = GPIO_NUM_18;
+    // Set all SDMMC pins to match Korvo1 hardware
+    slot_config.clk = GPIO_NUM_18;   // ESP0_SD_CLK
+    slot_config.cmd = GPIO_NUM_17;   // ESP0_SD_CMD
+    slot_config.d0 = GPIO_NUM_16;    // ESP0_SD_DAT0
+    slot_config.d3 = GPIO_NUM_15;    // ESP0_SD_DAT3 (used for card detection in some modes)
+    slot_config.width = 1;           // 1-bit mode (only D0 needed, but D3 helps with detection)
     
-    // Keep default CMD and D0 for now, but these may need adjustment
-    // If you know the other pins, update them here:
-    // slot_config.cmd = GPIO_NUM_XX;  // ESP0_SD_CMD
-    // slot_config.d0 = GPIO_NUM_XX;   // ESP0_SD_D0 (must not conflict with I2C SCL on GPIO2)
-    slot_config.width = 1;  // 1-bit mode
-    
-    // Add pull-up configuration for better signal integrity
-    slot_config.gpio_cd = GPIO_NUM_NC;  // No card detect pin
-    slot_config.gpio_wp = GPIO_NUM_NC;  // No write protect pin
+    // Card detect pin (optional but helpful)
+    slot_config.gpio_cd = GPIO_NUM_7;  // ESP0_SD_DET (card detect)
+    slot_config.gpio_wp = GPIO_NUM_NC; // No write protect pin
     
     ESP_LOGI(TAG, "SDMMC config: CLK=GPIO%d, CMD=GPIO%d, D0=GPIO%d, freq=%d kHz",
              slot_config.clk, slot_config.cmd, slot_config.d0, host.max_freq_khz);
