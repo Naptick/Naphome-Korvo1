@@ -149,12 +149,14 @@ esp_err_t sensor_manager_start(void)
     }
 
     s_should_run = true;
-    BaseType_t created = xTaskCreate(sensor_manager_task,
-                                     "sensor_manager",
-                                     SENSOR_MANAGER_TASK_STACK,
-                                     NULL,
-                                     SENSOR_MANAGER_TASK_PRIO,
-                                     &s_task_handle);
+    // Pin sensor manager task to CPU 0 (network/WiFi tasks stay on CPU 0)
+    BaseType_t created = xTaskCreatePinnedToCore(sensor_manager_task,
+                                                 "sensor_manager",
+                                                 SENSOR_MANAGER_TASK_STACK,
+                                                 NULL,
+                                                 SENSOR_MANAGER_TASK_PRIO,
+                                                 &s_task_handle,
+                                                 0);  // CPU 0 for network tasks
     ESP_RETURN_ON_FALSE(created == pdPASS,
                         ESP_ERR_NO_MEM,
                         SENSOR_MANAGER_TAG,

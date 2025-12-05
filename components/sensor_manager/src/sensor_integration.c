@@ -165,13 +165,14 @@ esp_err_t sensor_integration_start(void)
     // Start sensor manager
     ESP_RETURN_ON_ERROR(sensor_manager_start(), TAG, "sensor manager start failed");
 
-    // Start sampling task
-    BaseType_t ret = xTaskCreate(sensor_sampling_task,
-                                 "sensor_sampling",
-                                 4096,
-                                 NULL,
-                                 5,
-                                 &s_task_handle);
+    // Start sampling task - pin to CPU 0 (network tasks stay on CPU 0)
+    BaseType_t ret = xTaskCreatePinnedToCore(sensor_sampling_task,
+                                            "sensor_sampling",
+                                            4096,
+                                            NULL,
+                                            5,
+                                            &s_task_handle,
+                                            0);  // CPU 0 for network tasks
     if (ret != pdPASS) {
         ESP_LOGE(TAG, "Failed to create sensor sampling task");
         return ESP_ERR_NO_MEM;
