@@ -14,6 +14,33 @@ Copies all MP3 files to an SD card for use with the Korvo1 device.
 
 See [SD_CARD_SETUP.md](./SD_CARD_SETUP.md) for detailed instructions.
 
+## Sensor Data Testing
+
+### `send_synthetic_sensor_data.py`
+Continuously sends synthetic sensor data to the Naptick API endpoint for testing.
+
+**Usage:**
+```bash
+# Run with default settings (60s interval)
+python3 send_synthetic_sensor_data.py
+
+# Custom device ID and interval
+python3 send_synthetic_sensor_data.py --device-id my-device-123 --interval 30
+
+# Run as background daemon
+python3 send_synthetic_sensor_data.py --daemon
+
+# Stop daemon
+kill $(cat /tmp/naptick_sensor_sender.pid)
+```
+
+**Features:**
+- Generates realistic synthetic sensor data with trends
+- Sends to Naptick API: `https://api-uat.naptick.com/sensor-service/sensor-service/stream`
+- Automatic retry on failures
+- Background daemon mode
+- Real-time statistics
+
 ---
 
 # Audio Measurement Scripts
