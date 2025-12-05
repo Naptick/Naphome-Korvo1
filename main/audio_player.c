@@ -1,5 +1,4 @@
 #include "audio_player.h"
-#include "audio_eq.h"
 
 #include <inttypes.h>
 #include <string.h>
@@ -60,8 +59,6 @@ typedef struct {
     int current_sample_rate;
     i2c_master_bus_handle_t i2c_bus;
     i2c_master_dev_handle_t i2c_dev;
-    audio_eq_t eq_left;   // EQ for left channel
-    audio_eq_t eq_right;  // EQ for right channel
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
     i2s_chan_handle_t tx_handle;  // I2S TX channel handle (ESP-IDF 5.x)
 #endif
@@ -635,11 +632,6 @@ esp_err_t audio_player_init(const audio_player_config_t *cfg)
     esp_task_wdt_reset(); // Feed watchdog after codec init
     ESP_LOGI(TAG, "ES8311 codec initialized");
 
-    // Initialize EQ for both channels (enabled by default)
-    // EQ will be re-initialized with actual sample rate when playback starts
-    audio_eq_init(&s_audio.eq_left, s_audio.current_sample_rate, true);
-    audio_eq_init(&s_audio.eq_right, s_audio.current_sample_rate, true);
-
     s_audio.initialized = true;
     ESP_LOGI(TAG, "Audio player ready (sr=%d)", s_audio.current_sample_rate);
     return ESP_OK;
@@ -900,12 +892,6 @@ esp_err_t audio_player_play_wav(const uint8_t *wav_data, size_t wav_len, audio_p
     ESP_RETURN_ON_ERROR(ensure_sample_rate(fmt.sample_rate), TAG, "sr");
     ESP_LOGI(TAG, "I2S sample rate configured to %" PRIu32 " Hz", fmt.sample_rate);
     
-    // Initialize/reset EQ with actual sample rate
-    audio_eq_init(&s_audio.eq_left, fmt.sample_rate, true);
-    audio_eq_init(&s_audio.eq_right, fmt.sample_rate, true);
-    audio_eq_reset(&s_audio.eq_left);
-    audio_eq_reset(&s_audio.eq_right);
-    
     if (is_float) {
         // Convert 32-bit float to 16-bit PCM
         // Calculate frame count: data_size bytes / (bytes_per_sample * channels)
@@ -981,10 +967,6 @@ esp_err_t audio_player_play_wav(const uint8_t *wav_data, size_t wav_len, audio_p
                     float left = float_buffer[i * 2];
                     float right = float_buffer[i * 2 + 1];
                     
-                    // Process through EQ
-                    left = audio_eq_process(&s_audio.eq_left, 0, left);
-                    right = audio_eq_process(&s_audio.eq_right, 1, right);
-                    
                     // Clamp to [-1.0, 1.0] range
                     if (left > 1.0f) left = 1.0f;
                     if (left < -1.0f) left = -1.0f;
@@ -1011,9 +993,6 @@ esp_err_t audio_player_play_wav(const uint8_t *wav_data, size_t wav_len, audio_p
                 } else {
                     // Mono: process single channel
                     sample_f = float_buffer[i];
-                    
-                    // Process through EQ (use left channel EQ for mono)
-                    sample_f = audio_eq_process(&s_audio.eq_left, 0, sample_f);
                     
                     abs_sample = sample_f < 0.0f ? -sample_f : sample_f;
                     if (abs_sample > max_amp_this_chunk) {

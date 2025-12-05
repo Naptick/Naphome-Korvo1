@@ -2,7 +2,6 @@ idf_component_register(
     SRCS
         "app_main.c"
         "audio_player.c"
-        "audio_eq.c"
         "wake_word_manager.c"
         "voice_assistant.c"
         "wifi_manager.c"

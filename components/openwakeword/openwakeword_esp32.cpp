@@ -318,14 +318,15 @@ esp_err_t openwakeword_start(void)
     
     s_ctx.running = true;
     
-    // Create wake word detection task
-    xTaskCreate(
+    // Create wake word detection task - pin to CPU 1 for audio processing
+    xTaskCreatePinnedToCore(
         wake_word_task,
         "wakeword",
         4096,
         &s_ctx,
         5,
-        &s_ctx.task_handle
+        &s_ctx.task_handle,
+        1  // CPU 1 for audio processing
     );
     
     if (!s_ctx.task_handle) {

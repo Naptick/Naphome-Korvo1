@@ -637,6 +637,58 @@ void app_main(void)
         }
     }
     
+    // Initialize audio player EARLY (before WiFi) so we can play MP3 immediately
+    ESP_LOGI(TAG, "Starting audio player initialization...");
+    esp_task_wdt_reset();  // Feed watchdog before audio init
+    vTaskDelay(pdMS_TO_TICKS(50));  // Yield before long operation
+    
+    // Initialize audio player (this does I2C operations which can be slow)
+    esp_err_t audio_err = audio_player_init(&s_audio_config);
+    // Feed watchdog after audio player init
+    esp_task_wdt_reset();
+    if (audio_err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize audio player: %s", esp_err_to_name(audio_err));
+        // Continue anyway - LEDs will still work
+    } else {
+        ESP_LOGI(TAG, "Audio player initialized");
+    }
+    
+    // Initialize audio file manager EARLY (right after audio player)
+    ESP_LOGI(TAG, "Initializing audio file manager...");
+    esp_task_wdt_reset();
+    esp_err_t afm_err = audio_file_manager_init();
+    if (afm_err != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to initialize audio file manager: %s", esp_err_to_name(afm_err));
+    } else {
+        size_t track_count = audio_file_manager_get_count();
+        ESP_LOGI(TAG, "✅ Audio file manager initialized with %zu tracks", track_count);
+        
+        // Check if chants_thirdeyechakra file exists
+        audio_file_info_t file_info;
+        esp_err_t file_check = audio_file_manager_get_by_name("chants_thirdeyechakra", &file_info);
+        if (file_check == ESP_OK) {
+            ESP_LOGI(TAG, "✅ Found chants_thirdeyechakra.mp3: %s", file_info.display_name);
+        } else {
+            ESP_LOGW(TAG, "⚠️  chants_thirdeyechakra.mp3 not found in audio file list");
+            ESP_LOGW(TAG, "   Expected locations: /sdcard/sounds/chants_thirdeyechakra.mp3 or /sdcard/chants_thirdeyechakra.mp3");
+        }
+        
+        // Play chants_thirdeyechakra.mp3 from SD card (first 8 seconds, background)
+        ESP_LOGI(TAG, "Playing chants_thirdeyechakra.mp3 (8 seconds) from SD card...");
+        esp_err_t play_ret = audio_file_manager_play("chants_thirdeyechakra", 1.0f, 8);
+        if (play_ret != ESP_OK) {
+            ESP_LOGE(TAG, "❌ Failed to play chants_thirdeyechakra: %s", esp_err_to_name(play_ret));
+            if (play_ret == ESP_ERR_NOT_FOUND) {
+                ESP_LOGE(TAG, "   File not found. Please copy chants_thirdeyechakra.mp3 to SD card:");
+                ESP_LOGE(TAG, "   - /sdcard/sounds/chants_thirdeyechakra.mp3 (preferred)");
+                ESP_LOGE(TAG, "   - /sdcard/chants_thirdeyechakra.mp3 (fallback)");
+            }
+        } else {
+            ESP_LOGI(TAG, "✅ Started playback of chants_thirdeyechakra (8 seconds)");
+        }
+    }
+    esp_task_wdt_reset();
+    
     // Initialize LED strip
     led_strip_config_t strip_cfg = {
         .strip_gpio_num = CONFIG_LED_AUDIO_STRIP_GPIO,
@@ -671,27 +723,13 @@ void app_main(void)
     esp_task_wdt_reset();  // Feed watchdog after action manager init (disabled)
     vTaskDelay(pdMS_TO_TICKS(50)); // Yield to allow watchdog feed task to run
     
-    // Feed watchdog before audio player init (can take time with I2C operations)
-    esp_task_wdt_reset();
-    vTaskDelay(pdMS_TO_TICKS(50)); // Yield again before starting long operation
-    
-    ESP_LOGI(TAG, "Starting audio player initialization...");
-    esp_task_wdt_reset();  // Feed watchdog before audio init
-    vTaskDelay(pdMS_TO_TICKS(50));  // Yield before long operation
-    
-    // Initialize audio player (this does I2C operations which can be slow)
-    esp_err_t audio_err = audio_player_init(&s_audio_config);
-    // Feed watchdog after audio player init
-    esp_task_wdt_reset();
-    if (audio_err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize audio player: %s", esp_err_to_name(audio_err));
-        // Continue anyway - LEDs will still work
-    } else {
-        ESP_LOGI(TAG, "Audio player initialized");
-    }
-    
     // Feed watchdog before WiFi initialization
     esp_task_wdt_reset();
+    
+    // Delay WiFi initialization to allow MP3 playback to start first
+    // This prevents conflicts between I2S DMA callbacks and WiFi logging
+    ESP_LOGI(TAG, "Waiting for MP3 playback to start before initializing WiFi...");
+    vTaskDelay(pdMS_TO_TICKS(2000));  // Give MP3 playback 2 seconds to start
     
     // Initialize BLE for WiFi onboarding (before WiFi connection)
 #ifdef CONFIG_BT_ENABLED
@@ -939,40 +977,7 @@ void app_main(void)
         ESP_LOGW(TAG, "Failed to remove main task from watchdog: %s (will continue anyway)", esp_err_to_name(wdt_del_err));
     }
     
-    // Initialize audio file manager (for MP3 playback)
-    // Note: Main task is no longer monitored by watchdog, but we'll still feed it during scanning
-    ESP_LOGI(TAG, "Initializing audio file manager...");
-    esp_err_t afm_err = audio_file_manager_init();
-    if (afm_err != ESP_OK) {
-        ESP_LOGW(TAG, "Failed to initialize audio file manager: %s", esp_err_to_name(afm_err));
-    } else {
-        size_t track_count = audio_file_manager_get_count();
-        ESP_LOGI(TAG, "✅ Audio file manager initialized with %zu tracks", track_count);
-        
-        // Check if chants_thirdeyechakra file exists
-        audio_file_info_t file_info;
-        esp_err_t file_check = audio_file_manager_get_by_name("chants_thirdeyechakra", &file_info);
-        if (file_check == ESP_OK) {
-            ESP_LOGI(TAG, "✅ Found chants_thirdeyechakra.mp3: %s", file_info.display_name);
-        } else {
-            ESP_LOGW(TAG, "⚠️  chants_thirdeyechakra.mp3 not found in audio file list");
-            ESP_LOGW(TAG, "   Expected locations: /sdcard/sounds/chants_thirdeyechakra.mp3 or /sdcard/chants_thirdeyechakra.mp3");
-        }
-        
-        // Play chants_thirdeyechakra.mp3 from SD card (first 8 seconds, background)
-        ESP_LOGI(TAG, "Playing chants_thirdeyechakra.mp3 (8 seconds) from SD card...");
-        esp_err_t play_ret = audio_file_manager_play("chants_thirdeyechakra", 1.0f, 8);
-        if (play_ret != ESP_OK) {
-            ESP_LOGE(TAG, "❌ Failed to play chants_thirdeyechakra: %s", esp_err_to_name(play_ret));
-            if (play_ret == ESP_ERR_NOT_FOUND) {
-                ESP_LOGE(TAG, "   File not found. Please copy chants_thirdeyechakra.mp3 to SD card:");
-                ESP_LOGE(TAG, "   - /sdcard/sounds/chants_thirdeyechakra.mp3 (preferred)");
-                ESP_LOGE(TAG, "   - /sdcard/chants_thirdeyechakra.mp3 (fallback)");
-            }
-        } else {
-            ESP_LOGI(TAG, "✅ Started playback of chants_thirdeyechakra (8 seconds)");
-        }
-    }
+    // Audio file manager and MP3 playback already initialized earlier (right after SD card mount, before WiFi)
     
     // Initialize wake word detection
     // Korvo1 uses I2S1 for microphone (ES7210 ADC) - separate from I2S0 (speaker/ES8311)

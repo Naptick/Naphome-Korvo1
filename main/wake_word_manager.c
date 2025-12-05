@@ -677,14 +677,15 @@ esp_err_t wake_word_manager_start(void)
         } else {
             ESP_LOGI(TAG, "STT audio queue created (size: %d chunks)", STT_QUEUE_SIZE);
             
-            // Create STT processing task
-            xTaskCreate(
+            // Create STT processing task - pin to CPU 1 for audio processing
+            xTaskCreatePinnedToCore(
                 stt_processing_task,
                 "stt_processor",
                 8192,  // Larger stack for STT processing
                 NULL,
                 4,  // Lower priority than mic capture
-                &s_stt_task_handle
+                &s_stt_task_handle,
+                1  // CPU 1 for audio processing
             );
             
             if (!s_stt_task_handle) {
@@ -697,16 +698,17 @@ esp_err_t wake_word_manager_start(void)
         }
     }
     
-    // Create microphone capture task
+    // Create microphone capture task - pin to CPU 1 for audio processing
     s_running = true;
     TaskHandle_t task_handle;
-    xTaskCreate(
+    xTaskCreatePinnedToCore(
         mic_capture_task,
         "mic_capture",
         4096,
         NULL,
         5,
-        &task_handle
+        &task_handle,
+        1  // CPU 1 for audio processing
     );
     
     if (!task_handle) {

@@ -23,6 +23,8 @@
 #include <sys/stat.h>
 #include <stdio.h>
 #include <limits.h>
+#include <ctype.h>
+#include <errno.h>
 
 static const char *TAG = "audio_file_mgr";
 
@@ -202,18 +204,12 @@ static esp_err_t load_mp3_file_list(void)
             strncpy(temp_name, file->name, sizeof(temp_name) - 1);
             temp_name[sizeof(temp_name) - 1] = '\0';
             
-            for (int j = 0; search_paths[j] != NULL; j++) {
-                char temp_path[256];
-                snprintf(temp_path, sizeof(temp_path), search_paths[j], temp_name);
-                struct stat st;
-                if (stat(temp_path, &st) == 0) {
-                    strncpy(file->file_path, temp_path, sizeof(file->file_path) - 1);
-                    file->file_path[sizeof(file->file_path) - 1] = '\0';
-                    file->file_size = st.st_size;
-                    file->available = true;
-                    break;
-                }
-            }
+            // Set default path (most likely location) - DON'T check existence during init
+            // File availability will be checked lazily when the file is actually requested
+            // This speeds up initialization significantly (no stat() calls on slow SD card)
+            snprintf(file->file_path, sizeof(file->file_path), "/sdcard/sounds/%s.mp3", temp_name);
+            file->available = false;  // Will be checked when file is requested
+            file->file_size = 0;
             
             s_file_count++;
         }
@@ -254,16 +250,17 @@ static esp_err_t load_mp3_file_list(void)
                 strncpy(file->file_path, temp_path, sizeof(file->file_path) - 1);
                 file->file_path[sizeof(file->file_path) - 1] = '\0';
                 
-                // Get file size
-                struct stat st;
-                if (stat(file->file_path, &st) == 0) {
-                    file->file_size = st.st_size;
-                    file->available = true;
-                } else {
-                    file->available = false;
-                }
+                // Mark as available (we found it in the directory, so it exists)
+                // Skip stat() call during init to speed up initialization - we'll get file size when needed
+                file->available = true;
+                file->file_size = 0;  // Will be populated lazily when needed
                 
                 s_file_count++;
+                
+                // Feed watchdog every 20 files to prevent timeout during scanning
+                if (s_file_count % 20 == 0) {
+                    esp_task_wdt_reset();
+                }
             }
         }
     }
@@ -333,6 +330,7 @@ esp_err_t audio_file_manager_get_by_name(const char *name, audio_file_info_t *in
         clean_name[len - 4] = '\0';
     }
 
+    // First try exact match (case-insensitive)
     for (size_t i = 0; i < s_file_count; i++) {
         if (strcasecmp(s_audio_files[i].name, clean_name) == 0) {
             audio_file_entry_t *file = &s_audio_files[i];
@@ -343,7 +341,72 @@ esp_err_t audio_file_manager_get_by_name(const char *name, audio_file_info_t *in
             return ESP_OK;
         }
     }
-
+    
+    // If exact match fails, try fuzzy matching for 8.3 filenames
+    // Check if the stored name starts with the search name (handles "CHANTS~1" matching "chants_thirdeyechakra")
+    // Also check if search name contains key parts that might match
+    char search_upper[128];
+    strncpy(search_upper, clean_name, sizeof(search_upper) - 1);
+    search_upper[sizeof(search_upper) - 1] = '\0';
+    for (size_t i = 0; search_upper[i]; i++) {
+        search_upper[i] = toupper(search_upper[i]);
+    }
+    
+    // Extract key parts from search name (e.g., "chants_thirdeyechakra" -> "chants" and "thirdeye")
+    char key_part1[32] = {0};
+    char key_part2[32] = {0};
+    const char *underscore = strchr(clean_name, '_');
+    if (underscore) {
+        size_t part1_len = underscore - clean_name;
+        if (part1_len < sizeof(key_part1)) {
+            strncpy(key_part1, clean_name, part1_len);
+            key_part1[part1_len] = '\0';
+            for (size_t i = 0; key_part1[i]; i++) {
+                key_part1[i] = toupper(key_part1[i]);
+            }
+        }
+        strncpy(key_part2, underscore + 1, sizeof(key_part2) - 1);
+        key_part2[sizeof(key_part2) - 1] = '\0';
+        for (size_t i = 0; key_part2[i]; i++) {
+            key_part2[i] = toupper(key_part2[i]);
+        }
+    }
+    
+    for (size_t i = 0; i < s_file_count; i++) {
+        char stored_upper[128];
+        strncpy(stored_upper, s_audio_files[i].name, sizeof(stored_upper) - 1);
+        stored_upper[sizeof(stored_upper) - 1] = '\0';
+        for (size_t j = 0; stored_upper[j]; j++) {
+            stored_upper[j] = toupper(stored_upper[j]);
+        }
+        
+        // Check if stored name starts with search name (handles "CHANTS~1" for "chants_thirdeyechakra")
+        if (strncmp(stored_upper, search_upper, strlen(search_upper)) == 0) {
+            audio_file_entry_t *file = &s_audio_files[i];
+            info->name = file->name;
+            info->display_name = file->display_name;
+            info->data = NULL;
+            info->data_len = file->file_size;
+            ESP_LOGW(TAG, "Fuzzy match: '%s' matched '%s'", clean_name, file->name);
+            return ESP_OK;
+        }
+        
+        // Check if stored name contains key parts (e.g., "CHANTS~1" contains "CHANTS")
+        if (key_part1[0] && strstr(stored_upper, key_part1) != NULL) {
+            // Also check if it might be the right file by checking for other key parts
+            // For "chants_thirdeyechakra", look for files starting with "CHANTS" that might be it
+            if (strncmp(stored_upper, key_part1, strlen(key_part1)) == 0) {
+                audio_file_entry_t *file = &s_audio_files[i];
+                info->name = file->name;
+                info->display_name = file->display_name;
+                info->data = NULL;
+                info->data_len = file->file_size;
+                ESP_LOGW(TAG, "Fuzzy match (key part): '%s' matched '%s'", clean_name, file->name);
+                return ESP_OK;
+            }
+        }
+    }
+    
     return ESP_ERR_NOT_FOUND;
 }
 
@@ -370,17 +433,20 @@ static void mp3_playback_task(void *arg)
     int64_t duration_us = (duration_seconds > 0) ? (duration_seconds * 1000000LL) : INT64_MAX;
 
     // Open file
+    ESP_LOGI(TAG, "Opening file: %s", file_path);
     FILE *fp = fopen(file_path, "rb");
     if (!fp) {
-        ESP_LOGE(TAG, "Failed to open file: %s", file_path);
+        ESP_LOGE(TAG, "Failed to open file: %s (errno: %d)", file_path, errno);
         free(file_path);
         s_playing = false;
         s_playback_task = NULL;
         vTaskDelete(NULL);
         return;
     }
+    ESP_LOGI(TAG, "File opened successfully: %s", file_path);
 
     // Create MP3 decoder
+    ESP_LOGI(TAG, "Creating MP3 decoder...");
     mp3_decoder_t *decoder = mp3_decoder_create();
     if (!decoder) {
         ESP_LOGE(TAG, "Failed to create MP3 decoder");
@@ -391,6 +457,7 @@ static void mp3_playback_task(void *arg)
         vTaskDelete(NULL);
         return;
     }
+    ESP_LOGI(TAG, "MP3 decoder created successfully");
 
     // Allocate buffers
     const size_t mp3_buffer_size = 4096;
@@ -407,7 +474,7 @@ static void mp3_playback_task(void *arg)
     }
     
     if (!mp3_buffer || !pcm_buffer) {
-        ESP_LOGE(TAG, "Failed to allocate buffers");
+        ESP_LOGE(TAG, "Failed to allocate buffers (mp3=%p, pcm=%p)", mp3_buffer, pcm_buffer);
         mp3_decoder_destroy(decoder);
         fclose(fp);
         free(file_path);
@@ -418,12 +485,16 @@ static void mp3_playback_task(void *arg)
         vTaskDelete(NULL);
         return;
     }
+    ESP_LOGI(TAG, "Buffers allocated: mp3=%p (%zu bytes), pcm=%p (%zu bytes)", 
+             mp3_buffer, mp3_buffer_size, pcm_buffer, pcm_buffer_size);
 
     int sample_rate = 0;
     int channels = 0;
     size_t bytes_read = 0;
     bool eof = false;
+    int frame_count = 0;
 
+    ESP_LOGI(TAG, "Starting MP3 decode loop...");
     while (s_playing && !eof) {
         // Check duration limit
         if (duration_seconds > 0) {
@@ -464,10 +535,14 @@ static void mp3_playback_task(void *arg)
                                           &bytes_consumed);
 
         if (err == ESP_OK && samples_decoded > 0 && bytes_consumed > 0) {
+            frame_count++;
             if (sample_rate == 0) {
                 sample_rate = frame_sample_rate;
                 channels = frame_channels;
-                ESP_LOGI(TAG, "MP3: %d Hz, %d channel(s)", sample_rate, channels);
+                ESP_LOGI(TAG, "MP3 decoded: %d Hz, %d channel(s), frame %d", sample_rate, channels, frame_count);
+            }
+            if (frame_count % 100 == 0) {
+                ESP_LOGI(TAG, "MP3 playback progress: %d frames decoded", frame_count);
             }
 
             // Submit PCM to audio player
@@ -532,26 +607,65 @@ esp_err_t audio_file_manager_play(const char *name, float volume, int duration)
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Audio file not found: %s", name);
         ESP_LOGE(TAG, "Available files: %zu total", s_file_count);
-        // Log first few available files for debugging
-        for (size_t i = 0; i < (s_file_count < 5 ? s_file_count : 5); i++) {
-            ESP_LOGE(TAG, "  [%zu] %s (available: %s)", i, s_audio_files[i].name, 
-                    s_audio_files[i].available ? "yes" : "no");
+        // Log files that might match (starting with same prefix)
+        char search_prefix[32] = {0};
+        const char *underscore = strchr(name, '_');
+        if (underscore) {
+            size_t prefix_len = underscore - name;
+            if (prefix_len < sizeof(search_prefix)) {
+                strncpy(search_prefix, name, prefix_len);
+                search_prefix[prefix_len] = '\0';
+            }
+        } else {
+            strncpy(search_prefix, name, sizeof(search_prefix) - 1);
+        }
+        ESP_LOGE(TAG, "Searching for files starting with '%s'...", search_prefix);
+        size_t matches_found = 0;
+        for (size_t i = 0; i < s_file_count && matches_found < 10; i++) {
+            char stored_upper[128];
+            strncpy(stored_upper, s_audio_files[i].name, sizeof(stored_upper) - 1);
+            stored_upper[sizeof(stored_upper) - 1] = '\0';
+            for (size_t j = 0; stored_upper[j]; j++) {
+                stored_upper[j] = toupper(stored_upper[j]);
+            }
+            char prefix_upper[32];
+            strncpy(prefix_upper, search_prefix, sizeof(prefix_upper) - 1);
+            prefix_upper[sizeof(prefix_upper) - 1] = '\0';
+            for (size_t j = 0; prefix_upper[j]; j++) {
+                prefix_upper[j] = toupper(prefix_upper[j]);
+            }
+            if (strncmp(stored_upper, prefix_upper, strlen(prefix_upper)) == 0) {
+                ESP_LOGE(TAG, "  [%zu] %s -> %s (available: %s, path: %s)", i, s_audio_files[i].name, 
+                        s_audio_files[i].display_name,
+                        s_audio_files[i].available ? "yes" : "no",
+                        s_audio_files[i].file_path);
+                matches_found++;
+            }
+        }
+        if (matches_found == 0) {
+            // Log first few files if no matches
+            for (size_t i = 0; i < (s_file_count < 5 ? s_file_count : 5); i++) {
+                ESP_LOGE(TAG, "  [%zu] %s -> %s (available: %s)", i, s_audio_files[i].name, 
+                        s_audio_files[i].display_name,
+                        s_audio_files[i].available ? "yes" : "no");
+            }
         }
         return ESP_ERR_NOT_FOUND;
     }
     
-    ESP_LOGI(TAG, "Found file: %s -> %s (path: %s)", name, info.display_name, 
-             s_file_count > 0 ? "checking path..." : "no path info");
+    ESP_LOGI(TAG, "Found file: %s -> %s", name, info.display_name);
 
-    // Find file path
+    // Find file path - check multiple locations if needed
     char file_path[256] = {0};
     bool file_available = false;
+    
+    // First, try to find the file in our list
     for (size_t i = 0; i < s_file_count; i++) {
         if (strcasecmp(s_audio_files[i].name, info.name) == 0) {
             strncpy(file_path, s_audio_files[i].file_path, sizeof(file_path) - 1);
-            file_available = s_audio_files[i].available;
+            file_path[sizeof(file_path) - 1] = '\0';
             ESP_LOGI(TAG, "File entry found: path=%s, available=%s, size=%zu", 
-                    file_path, file_available ? "yes" : "no", s_audio_files[i].file_size);
+                    file_path, s_audio_files[i].available ? "yes" : "no", s_audio_files[i].file_size);
             break;
         }
     }
@@ -561,9 +675,42 @@ esp_err_t audio_file_manager_play(const char *name, float volume, int duration)
         return ESP_ERR_NOT_FOUND;
     }
     
+    // Check if file actually exists (lazy check - we skipped this during init for speed)
+    struct stat st;
+    if (stat(file_path, &st) == 0) {
+        file_available = true;
+        ESP_LOGI(TAG, "File exists: %s (size: %zu bytes)", file_path, (size_t)st.st_size);
+    } else {
+        // Try alternative paths
+        const char *search_paths[] = {
+            "/sdcard/sounds/%s.mp3",
+            "/sdcard/%s.mp3",
+            "/spiffs/sounds/%s.mp3",
+            "/spiffs/%s.mp3",
+            NULL
+        };
+        
+        char temp_name[128];
+        strncpy(temp_name, info.name, sizeof(temp_name) - 1);
+        temp_name[sizeof(temp_name) - 1] = '\0';
+        
+        for (int i = 0; search_paths[i] != NULL; i++) {
+            char alt_path[256];
+            snprintf(alt_path, sizeof(alt_path), search_paths[i], temp_name);
+            if (stat(alt_path, &st) == 0) {
+                strncpy(file_path, alt_path, sizeof(file_path) - 1);
+                file_path[sizeof(file_path) - 1] = '\0';
+                file_available = true;
+                ESP_LOGI(TAG, "File found at alternative path: %s (size: %zu bytes)", file_path, (size_t)st.st_size);
+                break;
+            }
+        }
+    }
+    
     if (!file_available) {
-        ESP_LOGE(TAG, "File exists in list but is not available: %s", file_path);
-        ESP_LOGE(TAG, "Please ensure the file exists on SD card at: %s", file_path);
+        ESP_LOGE(TAG, "File not found: %s", file_path);
+        ESP_LOGE(TAG, "Please ensure the file exists on SD card");
+        ESP_LOGE(TAG, "Tried: %s", file_path);
         return ESP_ERR_NOT_FOUND;
     }
 
@@ -584,12 +731,14 @@ esp_err_t audio_file_manager_play(const char *name, float volume, int duration)
     strncpy(s_current_playing, info.name, sizeof(s_current_playing) - 1);
     s_playing = true;
 
-    BaseType_t task_ret = xTaskCreate(mp3_playback_task,
-                                     "mp3_playback",
-                                     8192,
-                                     params,
-                                     5,
-                                     &s_playback_task);
+    // Pin MP3 playback task to CPU 1 to isolate from WiFi/network tasks on CPU 0
+    BaseType_t task_ret = xTaskCreatePinnedToCore(mp3_playback_task,
+                                                 "mp3_playback",
+                                                 8192,
+                                                 params,
+                                                 5,
+                                                 &s_playback_task,
+                                                 1);  // CPU 1 for audio processing
     if (task_ret != pdPASS) {
         free(params->file_path);
         free(params);
