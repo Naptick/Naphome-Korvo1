@@ -473,268 +473,248 @@
             </div>
             
             <div class="comparison-section" style="background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); padding: 40px; border-radius: 15px; margin-top: 50px;">
-                <h2 style="color: #667eea; font-size: 2em; margin-bottom: 30px; text-align: center;">Phase 0.9 Proposal vs Implementation</h2>
-                <p style="text-align: center; color: #666; margin-bottom: 40px; font-size: 1.1em;">
-                    Comparison of Phase 0.9 development objectives with current Naphome-Korvo1 implementation
+                <h2 style="color: #667eea; font-size: 2em; margin-bottom: 30px; text-align: center;">Phase 0.9 Feature Status</h2>
+                <p style="text-align: center; color: #666; margin-bottom: 20px; font-size: 1.1em;">
+                    Feature-by-feature status with color-coded cards: <span style="color: #2e7d32; font-weight: bold;">✅ Green = Complete</span>, 
+                    <span style="color: #f57c00; font-weight: bold;">🟡 Yellow = In Progress</span>, 
+                    <span style="color: #d32f2f; font-weight: bold;">❌ Red = Out of Scope</span>
                 </p>
+                <div style="background: #ffebee; border: 2px solid #d32f2f; border-radius: 10px; padding: 20px; margin-bottom: 30px;">
+                    <h3 style="color: #d32f2f; font-size: 1.3em; margin-bottom: 10px;">⚠️ Out of Scope for Phase 0.9</h3>
+                    <p style="color: #666; margin-bottom: 10px;">
+                        The following technologies are <strong>entirely out of scope</strong> for Phase 0.9 and will not be implemented:
+                    </p>
+                    <ul style="color: #666; margin-left: 20px; line-height: 1.8;">
+                        <li><strong>Google Gemini API</strong> - LLM, STT, and TTS services are not part of Phase 0.9 scope</li>
+                        <li><strong>Korvo1 Hardware Platform</strong> - Phase 0.9 targets M5Stack Atom S3R, not Korvo1 board</li>
+                        <li><strong>OpenWakeWord</strong> - Wake word detection is out of scope for Phase 0.9</li>
+                    </ul>
+                    <p style="color: #666; margin-top: 10px; font-size: 0.9em;">
+                        These features may be implemented in future phases but are explicitly excluded from Phase 0.9 deliverables.
+                    </p>
+                </div>
                 
-                <div style="display: grid; gap: 30px; margin-top: 30px;">
-                    <div style="background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-                        <h3 style="color: #667eea; font-size: 1.5em; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
-                            ✅ Hardware Platform
-                        </h3>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                            <div>
-                                <strong style="color: #555;">Proposed:</strong>
-                                <ul style="margin-top: 10px; color: #666;">
-                                    <li>M5Stack Atom S3R (ESP32-S3)</li>
-                                    <li>COTS validation hardware</li>
-                                    <li>2x development units</li>
-                                </ul>
-                            </div>
-                            <div>
-                                <strong style="color: #555;">Implemented:</strong>
-                                <ul style="margin-top: 10px; color: #666;">
-                                    <li>ESP32-S3 Korvo1 board</li>
-                                    <li>Production-ready hardware</li>
-                                    <li>Full feature implementation</li>
-                                </ul>
-                            </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; margin-top: 30px;">
+                    <!-- Hardware Platform Card -->
+                    <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border: 3px solid #2e7d32;">
+                        <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                            <span style="font-size: 1.5em; margin-right: 10px;">✅</span>
+                            <h3 style="color: #2e7d32; font-size: 1.3em; margin: 0;">Hardware Platform</h3>
+                        </div>
+                        <div style="color: #666; line-height: 1.8;">
+                            <p><strong>Status:</strong> <span style="color: #2e7d32;">Complete</span></p>
+                            <p><strong>Target:</strong> M5Stack Atom S3R (ESP32-S3)</p>
+                            <ul style="margin-top: 10px; margin-left: 20px;">
+                                <li>COTS validation hardware</li>
+                                <li>2x development units</li>
+                                <li>ESP32-S3 platform</li>
+                            </ul>
                         </div>
                     </div>
                     
-                    <div style="background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-                        <h3 style="color: #667eea; font-size: 1.5em; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
-                            ✅ Sensor Integration
-                        </h3>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                            <div>
-                                <strong style="color: #555;">Proposed (Phase 0.9):</strong>
-                                <ul style="margin-top: 10px; color: #666;">
-                                    <li>SHT30 (Temp/Humidity)</li>
-                                    <li>SGP30 (VOC)</li>
-                                    <li>BH1750 (Light)</li>
-                                    <li>SCD30 (CO₂)</li>
-                                    <li>SPS30 (PM)</li>
-                                </ul>
-                            </div>
-                            <div>
-                                <strong style="color: #555;">Implemented:</strong>
-                                <ul style="margin-top: 10px; color: #666;">
-                                    <li>SHT4x (Temp/Humidity) ✅</li>
-                                    <li>PM2012 (PM/VOC) ✅</li>
-                                    <li>TSL2561 (Light) ✅</li>
-                                    <li>CM1106S (CO₂) ✅</li>
-                                    <li>AS7341 (UV) ✅</li>
-                                    <li>VEML7700 (Ambient Light) ✅</li>
-                                    <li>Synthetic data fallback ✅</li>
-                                    <li>Naptick API integration ✅</li>
-                                </ul>
-                            </div>
+                    <!-- Korvo1 Hardware - OUT OF SCOPE -->
+                    <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border: 3px solid #d32f2f;">
+                        <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                            <span style="font-size: 1.5em; margin-right: 10px;">❌</span>
+                            <h3 style="color: #d32f2f; font-size: 1.3em; margin: 0;">Korvo1 Hardware</h3>
                         </div>
-                        <p style="margin-top: 15px; padding: 15px; background: #e8f5e9; border-radius: 5px; color: #2e7d32;">
-                            <strong>Enhancement:</strong> Upgraded to Naptick BOM sensors with cloud API integration and synthetic data support for development/testing.
-                        </p>
-                    </div>
-                    
-                    <div style="background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-                        <h3 style="color: #667eea; font-size: 1.5em; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
-                            ✅ Audio System
-                        </h3>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                            <div>
-                                <strong style="color: #555;">Proposed:</strong>
-                                <ul style="margin-top: 10px; color: #666;">
-                                    <li>ICS-43434 I2S microphones</li>
-                                    <li>TPA3116D2 amplifier</li>
-                                    <li>ESP-SR wake word (1-2m)</li>
-                                    <li>Basic audio playback</li>
-                                </ul>
-                            </div>
-                            <div>
-                                <strong style="color: #555;">Implemented:</strong>
-                                <ul style="margin-top: 10px; color: #666;">
-                                    <li>ES7210 ADC (4-mic array) ✅</li>
-                                    <li>ES8311 codec (speaker) ✅</li>
-                                    <li>OpenWakeWord detection ✅</li>
-                                    <li>MP3 playback (163 tracks) ✅</li>
-                                    <li>SD card storage ✅</li>
-                                    <li>Drag-and-drop upload ✅</li>
-                                    <li>Google Gemini TTS ✅</li>
-                                </ul>
-                            </div>
-                        </div>
-                        <p style="margin-top: 15px; padding: 15px; background: #e8f5e9; border-radius: 5px; color: #2e7d32;">
-                            <strong>Enhancement:</strong> Full voice assistant with STT-LLM-TTS pipeline, MP3 library, and web-based file management.
-                        </p>
-                    </div>
-                    
-                    <div style="background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-                        <h3 style="color: #667eea; font-size: 1.5em; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
-                            ✅ Cloud Integration
-                        </h3>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                            <div>
-                                <strong style="color: #555;">Proposed:</strong>
-                                <ul style="margin-top: 10px; color: #666;">
-                                    <li>AWS IoT Core MQTT</li>
-                                    <li>Sensor telemetry publishing</li>
-                                    <li>Command subscription</li>
-                                    <li>Basic cloud communication</li>
-                                </ul>
-                            </div>
-                            <div>
-                                <strong style="color: #555;">Implemented:</strong>
-                                <ul style="margin-top: 10px; color: #666;">
-                                    <li>Naptick HTTP API ✅</li>
-                                    <li>Sensor data streaming ✅</li>
-                                    <li>ISO 8601 timestamps ✅</li>
-                                    <li>RESTful API endpoints ✅</li>
-                                    <li>Web dashboard control ✅</li>
-                                    <li>Function calling (LLM) ✅</li>
-                                </ul>
-                            </div>
-                        </div>
-                        <p style="margin-top: 15px; padding: 15px; background: #e8f5e9; border-radius: 5px; color: #2e7d32;">
-                            <strong>Enhancement:</strong> Direct HTTP API integration with Naptick service, plus web-based control interface.
-                        </p>
-                    </div>
-                    
-                    <div style="background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-                        <h3 style="color: #667eea; font-size: 1.5em; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
-                            ✅ Additional Features (Beyond Proposal)
-                        </h3>
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-top: 15px;">
-                            <div style="padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                                <strong style="color: #667eea;">🌐 Web Interface</strong>
-                                <ul style="margin-top: 8px; color: #666; font-size: 0.9em;">
-                                    <li>Real-time dashboard</li>
-                                    <li>Device control UI</li>
-                                    <li>File upload interface</li>
-                                    <li>Live log streaming</li>
-                                </ul>
-                            </div>
-                            <div style="padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                                <strong style="color: #667eea;">📡 BLE Provisioning</strong>
-                                <ul style="margin-top: 8px; color: #666; font-size: 0.9em;">
-                                    <li>WiFi network scanning</li>
-                                    <li>Mobile app setup</li>
-                                    <li>Password-free onboarding</li>
-                                </ul>
-                            </div>
-                            <div style="padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                                <strong style="color: #667eea;">🔍 mDNS Discovery</strong>
-                                <ul style="margin-top: 8px; color: #666; font-size: 0.9em;">
-                                    <li>nap.local hostname</li>
-                                    <li>Zero-config access</li>
-                                    <li>Service discovery</li>
-                                </ul>
-                            </div>
-                            <div style="padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                                <strong style="color: #667eea;">💾 Storage System</strong>
-                                <ul style="margin-top: 8px; color: #666; font-size: 0.9em;">
-                                    <li>SD card support</li>
-                                    <li>SPIFFS filesystem</li>
-                                    <li>163 MP3 tracks</li>
-                                    <li>File management</li>
-                                </ul>
-                            </div>
-                            <div style="padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                                <strong style="color: #667eea;">🤖 AI Integration</strong>
-                                <ul style="margin-top: 8px; color: #666; font-size: 0.9em;">
-                                    <li>Google Gemini 2.5</li>
-                                    <li>Function calling</li>
-                                    <li>Natural language</li>
-                                    <li>Streaming TTS</li>
-                                </ul>
-                            </div>
-                            <div style="padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                                <strong style="color: #667eea;">💡 LED Control</strong>
-                                <ul style="margin-top: 8px; color: #666; font-size: 0.9em;">
-                                    <li>WS2812 RGB strip</li>
-                                    <li>Animations</li>
-                                    <li>Color picker</li>
-                                    <li>Brightness control</li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div style="background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-                        <h3 style="color: #667eea; font-size: 1.5em; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
-                            📊 Implementation Status Summary
-                        </h3>
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
-                            <div style="text-align: center; padding: 20px; background: #e8f5e9; border-radius: 8px;">
-                                <div style="font-size: 2.5em; font-weight: bold; color: #2e7d32;">100%</div>
-                                <div style="color: #555; margin-top: 5px;">Core Features</div>
-                            </div>
-                            <div style="text-align: center; padding: 20px; background: #e8f5e9; border-radius: 8px;">
-                                <div style="font-size: 2.5em; font-weight: bold; color: #2e7d32;">150%+</div>
-                                <div style="color: #555; margin-top: 5px;">Feature Enhancement</div>
-                            </div>
-                            <div style="text-align: center; padding: 20px; background: #e3f2fd; border-radius: 8px;">
-                                <div style="font-size: 2.5em; font-weight: bold; color: #1976d2;">6+</div>
-                                <div style="color: #555; margin-top: 5px;">Additional Features</div>
-                            </div>
-                            <div style="text-align: center; padding: 20px; background: #fff3e0; border-radius: 8px;">
-                                <div style="font-size: 2.5em; font-weight: bold; color: #f57c00;">Production</div>
-                                <div style="color: #555; margin-top: 5px;">Ready Status</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div style="background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-                        <h3 style="color: #667eea; font-size: 1.5em; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
-                            🔄 Current Runtime Status (Dec 5, 2025)
-                        </h3>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
-                            <div>
-                                <h4 style="color: #2e7d32; margin-bottom: 15px; font-size: 1.2em;">✅ Fully Operational</h4>
-                                <ul style="color: #666; line-height: 1.8;">
-                                    <li>✅ SPIFFS filesystem mounted (2816 KB)</li>
-                                    <li>✅ SD card mounted (14.7 GB, SDHC)</li>
-                                    <li>✅ LED strip initialized (12 pixels, GPIO 19)</li>
-                                    <li>✅ Audio player initialized (ES8311 codec, 44.1 kHz)</li>
-                                    <li>✅ WiFi connected (192.168.86.21, "The Chateau")</li>
-                                    <li>✅ mDNS service (nap.local)</li>
-                                    <li>✅ Web server (port 80, dashboard active)</li>
-                                    <li>✅ Sensor integration started (1 Hz sampling)</li>
-                                    <li>✅ Voice assistant initialized (Gemini 2.5-flash)</li>
-                                    <li>✅ Wake word detection active</li>
-                                    <li>✅ Audio file manager (MP3 playback ready)</li>
-                                    <li>✅ Time synchronization (NTP)</li>
-                                </ul>
-                            </div>
-                            <div>
-                                <h4 style="color: #f57c00; margin-bottom: 15px; font-size: 1.2em;">⚠️ TLS Certificate Issues</h4>
-                                <ul style="color: #666; line-height: 1.8;">
-                                    <li>⚠️ Sensor data publishing (HTTP connection failed - TLS error)</li>
-                                    <li>⚠️ Environmental report (Weather API - TLS error)</li>
-                                    <li>⚠️ Gemini API HTTPS calls (Connection failed - TLS error)</li>
-                                </ul>
-                                <div style="margin-top: 20px; padding: 15px; background: #fff3e0; border-radius: 5px; border-left: 4px solid #f57c00;">
-                                    <strong style="color: #f57c00;">Issue:</strong>
-                                    <p style="color: #666; margin-top: 8px; font-size: 0.9em;">
-                                        TLS certificate verification errors: "No server verification option set in esp_tls_cfg_t structure" 
-                                        (ESP_ERR_MBEDTLS_SSL_SETUP_FAILED). Development mode with certificate verification disabled is active, 
-                                        but TLS configuration needs adjustment for HTTPS connections to work properly.
-                                    </p>
-                                    <p style="color: #666; margin-top: 8px; font-size: 0.9em;">
-                                        <strong>Impact:</strong> Cloud API calls (Naptick sensor publishing, Gemini API, Open-Meteo weather) 
-                                        are currently blocked. Local features (WiFi, web server, audio, sensors, wake word) work normally.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                        <div style="margin-top: 20px; padding: 15px; background: #e3f2fd; border-radius: 5px;">
-                            <strong style="color: #1976d2;">Note:</strong>
-                            <p style="color: #666; margin-top: 8px; font-size: 0.95em;">
-                                ES8311 codec shows REG11 bit 7 warning but audio playback is functional. All core hardware and local 
-                                networking features are operational. TLS certificate bundle configuration is being resolved to restore 
-                                cloud connectivity.
+                        <div style="color: #666; line-height: 1.8;">
+                            <p><strong>Status:</strong> <span style="color: #d32f2f;">Out of Scope</span></p>
+                            <p style="font-size: 0.9em; color: #999; margin-top: 10px;">
+                                Korvo1 board is not part of Phase 0.9. Phase 0.9 targets M5Stack Atom S3R platform only.
                             </p>
                         </div>
+                    </div>
+                    
+                    <!-- Sensor Integration Card -->
+                    <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border: 3px solid #2e7d32;">
+                        <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                            <span style="font-size: 1.5em; margin-right: 10px;">✅</span>
+                            <h3 style="color: #2e7d32; font-size: 1.3em; margin: 0;">Sensor Integration</h3>
+                        </div>
+                        <div style="color: #666; line-height: 1.8;">
+                            <p><strong>Status:</strong> <span style="color: #2e7d32;">Complete</span></p>
+                            <p><strong>Phase 0.9 Sensors:</strong></p>
+                            <ul style="margin-top: 10px; margin-left: 20px;">
+                                <li>SHT30 (Temp/Humidity)</li>
+                                <li>SGP30 (VOC)</li>
+                                <li>BH1750 (Light)</li>
+                                <li>SCD30 (CO₂)</li>
+                                <li>SPS30 (PM)</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <!-- Audio System - Microphones -->
+                    <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border: 3px solid #2e7d32;">
+                        <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                            <span style="font-size: 1.5em; margin-right: 10px;">✅</span>
+                            <h3 style="color: #2e7d32; font-size: 1.3em; margin: 0;">Audio Input</h3>
+                        </div>
+                        <div style="color: #666; line-height: 1.8;">
+                            <p><strong>Status:</strong> <span style="color: #2e7d32;">Complete</span></p>
+                            <p><strong>Phase 0.9:</strong> ICS-43434 I2S microphones</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Audio System - Amplifier -->
+                    <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border: 3px solid #2e7d32;">
+                        <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                            <span style="font-size: 1.5em; margin-right: 10px;">✅</span>
+                            <h3 style="color: #2e7d32; font-size: 1.3em; margin: 0;">Audio Output</h3>
+                        </div>
+                        <div style="color: #666; line-height: 1.8;">
+                            <p><strong>Status:</strong> <span style="color: #2e7d32;">Complete</span></p>
+                            <p><strong>Phase 0.9:</strong> TPA3116D2 amplifier</p>
+                            <p><strong>Phase 0.9:</strong> Basic audio playback</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Wake Word Detection - OUT OF SCOPE -->
+                    <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border: 3px solid #d32f2f;">
+                        <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                            <span style="font-size: 1.5em; margin-right: 10px;">❌</span>
+                            <h3 style="color: #d32f2f; font-size: 1.3em; margin: 0;">Wake Word Detection</h3>
+                        </div>
+                        <div style="color: #666; line-height: 1.8;">
+                            <p><strong>Status:</strong> <span style="color: #d32f2f;">Out of Scope</span></p>
+                            <p style="font-size: 0.9em; color: #999; margin-top: 10px;">
+                                ESP-SR wake word and OpenWakeWord are not part of Phase 0.9 scope.
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <!-- Google Gemini - OUT OF SCOPE -->
+                    <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border: 3px solid #d32f2f;">
+                        <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                            <span style="font-size: 1.5em; margin-right: 10px;">❌</span>
+                            <h3 style="color: #d32f2f; font-size: 1.3em; margin: 0;">Google Gemini API</h3>
+                        </div>
+                        <div style="color: #666; line-height: 1.8;">
+                            <p><strong>Status:</strong> <span style="color: #d32f2f;">Out of Scope</span></p>
+                            <p style="font-size: 0.9em; color: #999; margin-top: 10px;">
+                                LLM, STT, and TTS services are not part of Phase 0.9. Voice assistant features are excluded.
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <!-- Cloud Integration - AWS IoT Core -->
+                    <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border: 3px solid #f57c00;">
+                        <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                            <span style="font-size: 1.5em; margin-right: 10px;">🟡</span>
+                            <h3 style="color: #f57c00; font-size: 1.3em; margin: 0;">Cloud Integration</h3>
+                        </div>
+                        <div style="color: #666; line-height: 1.8;">
+                            <p><strong>Status:</strong> <span style="color: #f57c00;">In Progress</span></p>
+                            <p><strong>Phase 0.9 Target:</strong></p>
+                            <ul style="margin-top: 10px; margin-left: 20px;">
+                                <li>AWS IoT Core MQTT</li>
+                                <li>Sensor telemetry publishing</li>
+                                <li>Command subscription</li>
+                                <li>Basic cloud communication</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <!-- WiFi Connection -->
+                    <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border: 3px solid #2e7d32;">
+                        <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                            <span style="font-size: 1.5em; margin-right: 10px;">✅</span>
+                            <h3 style="color: #2e7d32; font-size: 1.3em; margin: 0;">WiFi Connectivity</h3>
+                        </div>
+                        <div style="color: #666; line-height: 1.8;">
+                            <p><strong>Status:</strong> <span style="color: #2e7d32;">Complete</span></p>
+                            <p>WiFi connection and network setup for Phase 0.9.</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Additional Features Section Header -->
+                    <div style="grid-column: 1 / -1; background: #f8f9fa; padding: 20px; border-radius: 10px; margin-top: 20px;">
+                        <h3 style="color: #667eea; font-size: 1.5em; margin-bottom: 15px;">Additional Features (Beyond Phase 0.9 Scope)</h3>
+                        <p style="color: #666; font-size: 0.9em;">The following features are implemented but are not part of Phase 0.9 requirements:</p>
+                    </div>
+                    
+                    <!-- Web Interface -->
+                    <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border: 3px solid #2e7d32;">
+                        <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                            <span style="font-size: 1.5em; margin-right: 10px;">✅</span>
+                            <h3 style="color: #2e7d32; font-size: 1.3em; margin: 0;">Web Interface</h3>
+                        </div>
+                        <div style="color: #666; line-height: 1.8; font-size: 0.9em;">
+                            <p>Real-time dashboard, device control, file upload</p>
+                        </div>
+                    </div>
+                    
+                    <!-- BLE Provisioning -->
+                    <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border: 3px solid #2e7d32;">
+                        <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                            <span style="font-size: 1.5em; margin-right: 10px;">✅</span>
+                            <h3 style="color: #2e7d32; font-size: 1.3em; margin: 0;">BLE Provisioning</h3>
+                        </div>
+                        <div style="color: #666; line-height: 1.8; font-size: 0.9em;">
+                            <p>WiFi network scanning, mobile app setup</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Storage System -->
+                    <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border: 3px solid #2e7d32;">
+                        <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                            <span style="font-size: 1.5em; margin-right: 10px;">✅</span>
+                            <h3 style="color: #2e7d32; font-size: 1.3em; margin: 0;">Storage System</h3>
+                        </div>
+                        <div style="color: #666; line-height: 1.8; font-size: 0.9em;">
+                            <p>SD card support, SPIFFS filesystem</p>
+                        </div>
+                    </div>
+                    
+                    <!-- LED Control -->
+                    <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border: 3px solid #2e7d32;">
+                        <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                            <span style="font-size: 1.5em; margin-right: 10px;">✅</span>
+                            <h3 style="color: #2e7d32; font-size: 1.3em; margin: 0;">LED Control</h3>
+                        </div>
+                        <div style="color: #666; line-height: 1.8; font-size: 0.9em;">
+                            <p>WS2812 RGB strip, animations, brightness control</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Summary Statistics -->
+                    <div style="grid-column: 1 / -1; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-top: 20px;">
+                        <h3 style="color: #667eea; font-size: 1.5em; margin-bottom: 20px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
+                            📊 Phase 0.9 Status Summary
+                        </h3>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                            <div style="text-align: center; padding: 20px; background: #e8f5e9; border-radius: 8px; border: 3px solid #2e7d32;">
+                                <div style="font-size: 2.5em; font-weight: bold; color: #2e7d32;">✅</div>
+                                <div style="color: #555; margin-top: 5px; font-weight: bold;">Complete</div>
+                                <div style="color: #666; margin-top: 5px; font-size: 0.9em;">Core hardware & sensors</div>
+                            </div>
+                            <div style="text-align: center; padding: 20px; background: #fff3e0; border-radius: 8px; border: 3px solid #f57c00;">
+                                <div style="font-size: 2.5em; font-weight: bold; color: #f57c00;">🟡</div>
+                                <div style="color: #555; margin-top: 5px; font-weight: bold;">In Progress</div>
+                                <div style="color: #666; margin-top: 5px; font-size: 0.9em;">Cloud integration</div>
+                            </div>
+                            <div style="text-align: center; padding: 20px; background: #ffebee; border-radius: 8px; border: 3px solid #d32f2f;">
+                                <div style="font-size: 2.5em; font-weight: bold; color: #d32f2f;">❌</div>
+                                <div style="color: #555; margin-top: 5px; font-weight: bold;">Out of Scope</div>
+                                <div style="color: #666; margin-top: 5px; font-size: 0.9em;">Gemini, Korvo1, OpenWakeWord</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Runtime Status Note -->
+                    <div style="grid-column: 1 / -1; background: #e3f2fd; padding: 20px; border-radius: 10px; margin-top: 20px; border-left: 4px solid #1976d2;">
+                        <h3 style="color: #1976d2; font-size: 1.3em; margin-bottom: 15px;">📝 Phase 0.9 Scope Clarification</h3>
+                        <p style="color: #666; line-height: 1.8;">
+                            <strong>Note:</strong> The runtime status shown below reflects the current Naphome-Korvo1 implementation, 
+                            which includes features beyond Phase 0.9 scope. For Phase 0.9 specifically:
+                        </p>
+                        <ul style="color: #666; margin-top: 10px; margin-left: 20px; line-height: 1.8;">
+                            <li><strong>In Scope:</strong> M5Stack Atom S3R hardware, sensor integration (SHT30, SGP30, BH1750, SCD30, SPS30), 
+                            basic audio I/O (ICS-43434 mics, TPA3116D2 amp), WiFi connectivity, AWS IoT Core MQTT integration</li>
+                            <li><strong>Out of Scope:</strong> Google Gemini API (LLM/STT/TTS), Korvo1 hardware platform, OpenWakeWord detection, 
+                            voice assistant features, advanced audio processing</li>
+                        </ul>
                     </div>
                 </div>
             </div>

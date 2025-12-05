@@ -16,11 +16,13 @@
 #include "driver/sdspi_host.h"
 #include "sdmmc_cmd.h"
 #include "esp_task_wdt.h"
+#include "esp_timer.h"
 #include <string.h>
 #include <stdlib.h>
 #include <dirent.h>
 #include <sys/stat.h>
 #include <stdio.h>
+#include <limits.h>
 
 static const char *TAG = "audio_file_mgr";
 
@@ -44,6 +46,12 @@ static char s_current_playing[128] = {0};
 
 // MP3 playback task
 static TaskHandle_t s_playback_task = NULL;
+
+// Playback parameters
+typedef struct {
+    char *file_path;
+    int duration_seconds;  // -1 for full file
+} playback_params_t;
 
 // Forward declarations
 static void mp3_playback_task(void *arg);
@@ -342,13 +350,24 @@ esp_err_t audio_file_manager_get_by_name(const char *name, audio_file_info_t *in
 // MP3 playback task
 static void mp3_playback_task(void *arg)
 {
-    char *file_path = (char *)arg;
-    if (!file_path) {
+    playback_params_t *params = (playback_params_t *)arg;
+    if (!params || !params->file_path) {
+        if (params) {
+            free(params->file_path);
+            free(params);
+        }
         vTaskDelete(NULL);
         return;
     }
 
-    ESP_LOGI(TAG, "Starting MP3 playback: %s", file_path);
+    char *file_path = params->file_path;
+    int duration_seconds = params->duration_seconds;
+    
+    ESP_LOGI(TAG, "Starting MP3 playback: %s (duration: %d seconds)", file_path, duration_seconds);
+
+    // Track playback time for duration limiting
+    int64_t start_time_us = esp_timer_get_time();
+    int64_t duration_us = (duration_seconds > 0) ? (duration_seconds * 1000000LL) : INT64_MAX;
 
     // Open file
     FILE *fp = fopen(file_path, "rb");
@@ -377,8 +396,15 @@ static void mp3_playback_task(void *arg)
     const size_t mp3_buffer_size = 4096;
     const size_t pcm_buffer_size = 1152 * 2 * sizeof(int16_t);
     
-    uint8_t *mp3_buffer = malloc(mp3_buffer_size);
-    int16_t *pcm_buffer = malloc(pcm_buffer_size);
+    // Prefer PSRAM for audio buffers to preserve internal RAM for TLS
+    uint8_t *mp3_buffer = heap_caps_malloc(mp3_buffer_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!mp3_buffer) {
+        mp3_buffer = malloc(mp3_buffer_size);
+    }
+    int16_t *pcm_buffer = heap_caps_malloc(pcm_buffer_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!pcm_buffer) {
+        pcm_buffer = malloc(pcm_buffer_size);
+    }
     
     if (!mp3_buffer || !pcm_buffer) {
         ESP_LOGE(TAG, "Failed to allocate buffers");
@@ -399,6 +425,14 @@ static void mp3_playback_task(void *arg)
     bool eof = false;
 
     while (s_playing && !eof) {
+        // Check duration limit
+        if (duration_seconds > 0) {
+            int64_t elapsed_us = esp_timer_get_time() - start_time_us;
+            if (elapsed_us >= duration_us) {
+                ESP_LOGI(TAG, "Duration limit reached (%d seconds), stopping playback", duration_seconds);
+                break;
+            }
+        }
         // Read MP3 data
         if (bytes_read < mp3_buffer_size) {
             size_t to_read = mp3_buffer_size - bytes_read;
@@ -470,7 +504,8 @@ static void mp3_playback_task(void *arg)
     free(pcm_buffer);
     mp3_decoder_destroy(decoder);
     fclose(fp);
-    free(file_path);
+    free(params->file_path);
+    free(params);
 
     ESP_LOGI(TAG, "MP3 playback complete");
     s_playing = false;
@@ -481,7 +516,6 @@ static void mp3_playback_task(void *arg)
 esp_err_t audio_file_manager_play(const char *name, float volume, int duration)
 {
     (void)volume;  // Volume handled by audio_player
-    (void)duration;  // Duration not implemented yet
 
     if (!s_initialized) {
         ESP_RETURN_ON_ERROR(audio_file_manager_init(), TAG, "init failed");
@@ -490,19 +524,34 @@ esp_err_t audio_file_manager_play(const char *name, float volume, int duration)
     // Stop current playback
     audio_file_manager_stop();
 
+    ESP_LOGI(TAG, "Looking for audio file: %s", name);
+    
     // Find file
     audio_file_info_t info;
     esp_err_t ret = audio_file_manager_get_by_name(name, &info);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Audio file not found: %s", name);
+        ESP_LOGE(TAG, "Available files: %zu total", s_file_count);
+        // Log first few available files for debugging
+        for (size_t i = 0; i < (s_file_count < 5 ? s_file_count : 5); i++) {
+            ESP_LOGE(TAG, "  [%zu] %s (available: %s)", i, s_audio_files[i].name, 
+                    s_audio_files[i].available ? "yes" : "no");
+        }
         return ESP_ERR_NOT_FOUND;
     }
+    
+    ESP_LOGI(TAG, "Found file: %s -> %s (path: %s)", name, info.display_name, 
+             s_file_count > 0 ? "checking path..." : "no path info");
 
     // Find file path
     char file_path[256] = {0};
+    bool file_available = false;
     for (size_t i = 0; i < s_file_count; i++) {
         if (strcasecmp(s_audio_files[i].name, info.name) == 0) {
             strncpy(file_path, s_audio_files[i].file_path, sizeof(file_path) - 1);
+            file_available = s_audio_files[i].available;
+            ESP_LOGI(TAG, "File entry found: path=%s, available=%s, size=%zu", 
+                    file_path, file_available ? "yes" : "no", s_audio_files[i].file_size);
             break;
         }
     }
@@ -511,12 +560,26 @@ esp_err_t audio_file_manager_play(const char *name, float volume, int duration)
         ESP_LOGE(TAG, "File path not found for: %s", name);
         return ESP_ERR_NOT_FOUND;
     }
+    
+    if (!file_available) {
+        ESP_LOGE(TAG, "File exists in list but is not available: %s", file_path);
+        ESP_LOGE(TAG, "Please ensure the file exists on SD card at: %s", file_path);
+        return ESP_ERR_NOT_FOUND;
+    }
 
-    // Start playback task
-    char *task_path = strdup(file_path);
-    if (!task_path) {
+    // Allocate playback parameters
+    playback_params_t *params = malloc(sizeof(playback_params_t));
+    if (!params) {
         return ESP_ERR_NO_MEM;
     }
+    
+    params->file_path = strdup(file_path);
+    if (!params->file_path) {
+        free(params);
+        return ESP_ERR_NO_MEM;
+    }
+    
+    params->duration_seconds = duration;
 
     strncpy(s_current_playing, info.name, sizeof(s_current_playing) - 1);
     s_playing = true;
@@ -524,16 +587,17 @@ esp_err_t audio_file_manager_play(const char *name, float volume, int duration)
     BaseType_t task_ret = xTaskCreate(mp3_playback_task,
                                      "mp3_playback",
                                      8192,
-                                     task_path,
+                                     params,
                                      5,
                                      &s_playback_task);
     if (task_ret != pdPASS) {
-        free(task_path);
+        free(params->file_path);
+        free(params);
         s_playing = false;
         return ESP_ERR_NO_MEM;
     }
 
-    ESP_LOGI(TAG, "Started playback: %s", info.display_name);
+    ESP_LOGI(TAG, "Started playback: %s (duration: %d seconds)", info.display_name, duration);
     return ESP_OK;
 }
 

@@ -924,7 +924,11 @@ esp_err_t audio_player_play_wav(const uint8_t *wav_data, size_t wav_len, audio_p
         const size_t three_second_frame = (size_t)fmt.sample_rate * 3;  // Frame number at 3 seconds
         bool three_second_logged = false;
         bool signal_start_logged = false;  // Track when actual audio signal starts
-        float *float_buffer = malloc(chunk_size * sizeof(float) * fmt.num_channels);
+        // Prefer PSRAM for audio processing buffers
+        float *float_buffer = heap_caps_malloc(chunk_size * sizeof(float) * fmt.num_channels, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (!float_buffer) {
+            float_buffer = malloc(chunk_size * sizeof(float) * fmt.num_channels);
+        }
         int16_t *pcm_buffer = malloc(chunk_size * sizeof(int16_t) * fmt.num_channels);
         if (!float_buffer || !pcm_buffer) {
             ESP_LOGE(TAG, "Failed to allocate conversion buffers");

@@ -4,11 +4,20 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
+#include "freertos/projdefs.h"
 #include "esp_heap_caps.h"
 #include <string.h>
 #include <cstdlib>
 #include <cstring>
 #include <cmath>
+
+// For heap_caps_malloc
+#ifndef MALLOC_CAP_SPIRAM
+#define MALLOC_CAP_SPIRAM (1 << 6)
+#endif
+#ifndef MALLOC_CAP_8BIT
+#define MALLOC_CAP_8BIT (1 << 0)
+#endif
 
 // Forward declaration - LED indicators will be linked from main component
 extern "C" {
@@ -47,14 +56,19 @@ static openwakeword_context s_ctx = {
 
 // Placeholder for OpenWakeWord model
 // In real implementation, this would be the actual model instance
-static void *s_model = nullptr;
+// static void *s_model = nullptr;  // Unused - kept for potential future use
 
 static void wake_word_task(void *pvParameters)
 {
     openwakeword_context *ctx = (openwakeword_context *)pvParameters;
     // Buffer size: 512 samples = 32ms at 16kHz (matches queue chunk size)
+    // Use PSRAM for audio buffer to save internal RAM
     const size_t buffer_size = 512;
-    int16_t *audio_buffer = (int16_t *)std::malloc(buffer_size * sizeof(int16_t));
+    int16_t *audio_buffer = (int16_t *)heap_caps_malloc(buffer_size * sizeof(int16_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!audio_buffer) {
+        // Fallback to internal RAM if PSRAM fails
+        audio_buffer = (int16_t *)std::malloc(buffer_size * sizeof(int16_t));
+    }
     
     if (!audio_buffer) {
         ESP_LOGE(TAG, "Failed to allocate audio buffer");
@@ -146,7 +160,7 @@ static void wake_word_task(void *pvParameters)
                 speech_count++;
                 if (speech_count > 0 && speech_count % 5 == 0) {
                     ESP_LOGI(TAG, "🔊 Speech continuing... %d chunks (~%dms)",
-                             speech_count, (speech_count * 512 * 1000) / ctx->sample_rate);
+                             speech_count, (int)((speech_count * 512 * 1000) / ctx->sample_rate));
                 }
                 silence_count = 0;
             } else {
@@ -160,8 +174,8 @@ static void wake_word_task(void *pvParameters)
                 if (speech_count >= SPEECH_CHUNKS_REQUIRED && silence_count >= SILENCE_CHUNKS_REQUIRED) {
                     // Potential wake word detected
                     ESP_LOGI(TAG, "✅ *** WAKE WORD DETECTED! *** (energy-based) - speech: %d chunks (~%dms), silence: %d chunks (~%dms)", 
-                             speech_count, (speech_count * 512 * 1000) / ctx->sample_rate,
-                             silence_count, (silence_count * 512 * 1000) / ctx->sample_rate);
+                             speech_count, (int)((speech_count * 512 * 1000) / ctx->sample_rate),
+                             silence_count, (int)((silence_count * 512 * 1000) / ctx->sample_rate));
                     
                     // Show wake word indicator (green flash)
                     led_indicators_wake_word_detected();
@@ -183,6 +197,9 @@ static void wake_word_task(void *pvParameters)
     
     std::free(audio_buffer);
     ESP_LOGI(TAG, "Wake word detection task stopped");
+    
+    // Clear task handle before deleting self to prevent double-delete
+    ctx->task_handle = NULL;
     vTaskDelete(NULL);
 }
 
@@ -202,11 +219,11 @@ esp_err_t openwakeword_init(uint32_t sample_rate, wake_word_callback_t callback)
     s_ctx.initialized = true;
     s_ctx.running = false;
     
-    // Create audio queue with larger size using PSRAM
-    // Queue size: 64 chunks of 512 samples each = 32ms per chunk, ~2 seconds total buffer
-    // This prevents queue overflow during processing delays
+    // Create audio queue - reduced size to save internal RAM
+    // Queue size: 16 chunks of 512 samples each = 32ms per chunk, ~512ms total buffer
+    // This prevents queue overflow during processing delays while conserving memory
     // Note: Using 512 samples to match mic capture task output (not 1024)
-    const size_t queue_size = 64;  // Increased from 4 to 64 for better buffering
+    const size_t queue_size = 16;  // Reduced from 64 to 16 to save internal RAM (64KB -> 16KB)
     const size_t chunk_size_samples = 512;  // 32ms at 16kHz (matches mic capture task)
     s_ctx.audio_queue = xQueueCreate(queue_size, chunk_size_samples * sizeof(int16_t));
     if (!s_ctx.audio_queue) {
@@ -329,11 +346,20 @@ void openwakeword_stop(void)
     
     s_ctx.running = false;
     
-    // Wait for task to finish
+    // Wait for task to finish gracefully
+    // The task will delete itself and clear the handle
     if (s_ctx.task_handle) {
-        vTaskDelay(pdMS_TO_TICKS(100));
-        if (s_ctx.task_handle) {
-            vTaskDelete(s_ctx.task_handle);
+        // Give task time to exit gracefully (it checks s_ctx.running and exits)
+        // Wait up to 500ms for task to finish
+        for (int i = 0; i < 10 && s_ctx.task_handle != NULL; i++) {
+            vTaskDelay(pdMS_TO_TICKS(50));
+        }
+        
+        // If handle is still set, task might be stuck - but don't try to delete
+        // as it may have already deleted itself (handle would be invalid)
+        // Just clear our reference
+        if (s_ctx.task_handle != NULL) {
+            ESP_LOGW(TAG, "Task handle still set after wait, clearing reference");
             s_ctx.task_handle = NULL;
         }
     }

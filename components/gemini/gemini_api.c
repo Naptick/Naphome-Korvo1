@@ -3,8 +3,11 @@
 #include "esp_http_client.h"
 #include "esp_timer.h"
 #include "esp_tls.h"
+#ifdef CONFIG_MBEDTLS_CERTIFICATE_BUNDLE
 #include "esp_crt_bundle.h"
+#endif
 #include "esp_heap_caps.h"
+#include "tls_mutex.h"
 #include "cJSON.h"
 #include "mbedtls/base64.h"
 #include <string.h>
@@ -168,24 +171,25 @@ static esp_err_t http_post_json_with_auth(const char *url, const char *json_data
     // Determine buffer size based on API endpoint
     // TTS responses are base64-encoded (35-50KB raw response, ~26-37KB after base64 decode)
     // LLM responses are JSON text (~20-40KB)
-    // Device has only ~250KB free heap, so be conservative
-    size_t RESPONSE_BUFFER_SIZE = 128 * 1024;  // Default 128KB for LLM
+    // Optimized: Use PSRAM for all large buffers to preserve internal RAM for TLS
+    size_t RESPONSE_BUFFER_SIZE = 96 * 1024;  // Reduced to 96KB for LLM (PSRAM)
 
     // Check if this is a TTS request (use large buffer)
     if (strstr(url, "texttospeech") != NULL) {
-        RESPONSE_BUFFER_SIZE = 256 * 1024;  // TTS: 256KB (with PSRAM enabled, plenty of margin)
+        RESPONSE_BUFFER_SIZE = 192 * 1024;  // TTS: 192KB (reduced, use PSRAM)
     }
 
     if (!response->data) {
-        // Allocate fixed-size buffer from heap, prefer PSRAM for large buffers
-        // Try PSRAM first for large buffers (>64KB), fall back to internal RAM
-        if (RESPONSE_BUFFER_SIZE > 64 * 1024) {
+        // Always prefer PSRAM for response buffers (>32KB) to preserve internal RAM for TLS
+        // TLS connections need internal RAM for SHA buffers and SSL contexts
+        if (RESPONSE_BUFFER_SIZE > 32 * 1024) {
             response->data = heap_caps_malloc(RESPONSE_BUFFER_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
             if (!response->data) {
                 ESP_LOGW(TAG, "PSRAM allocation failed, trying internal RAM");
                 response->data = heap_caps_malloc(RESPONSE_BUFFER_SIZE, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
             }
         } else {
+            // Small buffers can use regular malloc (will prefer PSRAM if SPIRAM_USE_MALLOC=y)
             response->data = malloc(RESPONSE_BUFFER_SIZE);
         }
         
@@ -220,6 +224,11 @@ static esp_err_t http_post_json_with_auth(const char *url, const char *json_data
     // Currently skipping due to PK verify errors (0x4290) - certificate signature verification failing
     // This is a temporary workaround for development
     ESP_LOGW(TAG, "⚠️  Development mode: Certificate verification disabled");
+    
+    // Configure HTTP client to skip certificate verification
+    // CONFIG_ESP_TLS_SKIP_SERVER_CERT_VERIFY=y in sdkconfig.defaults enables
+    // MBEDTLS_SSL_VERIFY_NONE when no CA cert is provided, avoiding the
+    // "No server verification option set" error
     esp_http_client_config_t config = {
         .url = url,
         .event_handler = http_event_handler,
@@ -227,13 +236,23 @@ static esp_err_t http_post_json_with_auth(const char *url, const char *json_data
         .timeout_ms = 30000,
         .skip_cert_common_name_check = true,  // Skip certificate verification for development
         .crt_bundle_attach = NULL,  // Don't use certificate bundle
+        .use_global_ca_store = false,  // Don't use global CA store
         .is_async = false,
         .disable_auto_redirect = false,
     };
     
+    // Acquire TLS mutex to serialize TLS connections
+    // This prevents concurrent TLS connections that cause memory allocation errors
+    esp_err_t mutex_err = tls_mutex_take(pdMS_TO_TICKS(10000));  // 10 second timeout
+    if (mutex_err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to acquire TLS mutex: %s", esp_err_to_name(mutex_err));
+        return ESP_ERR_TIMEOUT;
+    }
+    
     esp_http_client_handle_t client = esp_http_client_init(&config);
     if (!client) {
         ESP_LOGE(TAG, "Failed to initialize HTTP client");
+        tls_mutex_give();  // Release mutex on error
         return ESP_FAIL;
     }
     
@@ -259,6 +278,9 @@ static esp_err_t http_post_json_with_auth(const char *url, const char *json_data
              status_code, elapsed_us / 1000, response->len, response->data);
 
     esp_http_client_cleanup(client);
+    
+    // Release TLS mutex after connection is complete
+    tls_mutex_give();
 
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "HTTP POST failed: %s", esp_err_to_name(err));
@@ -902,8 +924,9 @@ esp_err_t gemini_tts_streaming(const char *text, gemini_tts_playback_callback_t 
 
     // Allocate large PSRAM buffer for entire JSON response
     // TTS responses are typically 50-200KB JSON with base64-encoded audio
+    // Time announcements can be longer, so increase buffer size
     // Leave 1 byte for null terminator
-    const size_t JSON_BUFFER_SIZE = 256 * 1024;  // 256KB in PSRAM (sufficient for most TTS responses)
+    const size_t JSON_BUFFER_SIZE = 512 * 1024;  // 512KB in PSRAM (increased for longer TTS responses like time announcements)
     http_buffer_t response = {0};
     response.data = heap_caps_malloc(JSON_BUFFER_SIZE, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!response.data) {
@@ -967,43 +990,109 @@ esp_err_t gemini_tts_streaming(const char *text, gemini_tts_playback_callback_t 
     if (!json_root) {
         // JSON parsing failed - try manual extraction as fallback
         ESP_LOGW(TAG, "cJSON parse failed, trying manual extraction");
-        const char *audio_content_start = strstr((const char *)response.data, "\"audioContent\"");
+        
+        // Ensure response is treated as a string for searching
+        const char *response_str = (const char *)response.data;
+        
+        // Search for "audioContent" in the response
+        const char *audio_content_start = strstr(response_str, "\"audioContent\"");
+        if (!audio_content_start) {
+            // Try case-insensitive search
+            for (size_t i = 0; i < response.len - 13; i++) {
+                if (strncasecmp(response_str + i, "\"audioContent\"", 14) == 0) {
+                    audio_content_start = response_str + i;
+                    break;
+                }
+            }
+        }
+        
         if (audio_content_start) {
             // Find the colon after "audioContent"
             const char *colon = strchr(audio_content_start, ':');
-            if (colon) {
+            if (colon && colon < response_str + response.len) {
                 // Skip whitespace after colon
                 const char *value_start = colon + 1;
-                while (*value_start == ' ' || *value_start == '\t') {
+                while (value_start < response_str + response.len && 
+                       (*value_start == ' ' || *value_start == '\t' || *value_start == '\n' || *value_start == '\r')) {
                     value_start++;
                 }
+                
                 // Find opening quote
-                if (*value_start == '"') {
+                if (value_start < response_str + response.len && *value_start == '"') {
                     base64_audio = value_start + 1; // Start after opening quote
-                    // Find closing quote - search forward from start, not backward from end
-                    const char *quote_end = strchr(base64_audio, '"');
+                    
+                    // Find closing quote - search forward from start
+                    const char *quote_end = NULL;
+                    for (const char *p = base64_audio; p < response_str + response.len; p++) {
+                        if (*p == '"' && (p == base64_audio || *(p-1) != '\\')) {
+                            // Found unescaped quote
+                            quote_end = p;
+                            break;
+                        }
+                    }
+                    
                     if (quote_end && quote_end > base64_audio) {
                         base64_len = quote_end - base64_audio;
-                        ESP_LOGI(TAG, "Manually extracted base64: %zu chars", base64_len);
+                        
+                        // Validate we're within response bounds
+                        if (base64_audio + base64_len > response_str + response.len) {
+                            ESP_LOGE(TAG, "Extracted base64 extends beyond response buffer");
+                            free(response.data);
+                            return ESP_FAIL;
+                        }
+                        
+                        // Trim any leading/trailing whitespace or control characters
+                        while (base64_len > 0 && base64_audio < response_str + response.len && 
+                               (base64_audio[0] == ' ' || base64_audio[0] == '\t' || 
+                                base64_audio[0] == '\n' || base64_audio[0] == '\r' || 
+                                (unsigned char)base64_audio[0] < 0x20)) {
+                            base64_audio++;
+                            base64_len--;
+                        }
+                        while (base64_len > 0 && base64_audio + base64_len - 1 < response_str + response.len &&
+                               (base64_audio[base64_len - 1] == ' ' || 
+                                base64_audio[base64_len - 1] == '\t' || 
+                                base64_audio[base64_len - 1] == '\n' || 
+                                base64_audio[base64_len - 1] == '\r' ||
+                                (unsigned char)base64_audio[base64_len - 1] < 0x20)) {
+                            base64_len--;
+                        }
+                        
+                        // Verify we're still pointing to valid memory
+                        if (base64_audio < response_str || base64_audio + base64_len > response_str + response.len) {
+                            ESP_LOGE(TAG, "Base64 pointer out of bounds after trimming");
+                            free(response.data);
+                            return ESP_FAIL;
+                        }
+                        
+                        ESP_LOGI(TAG, "Manually extracted base64: %zu chars (after trimming), offset: %zu", 
+                                base64_len, base64_audio - response_str);
                     } else {
                         ESP_LOGE(TAG, "Could not find closing quote for audioContent");
                     }
                 } else {
-                    ESP_LOGE(TAG, "audioContent value does not start with quote");
+                    ESP_LOGE(TAG, "audioContent value does not start with quote (found: 0x%02x)", 
+                            value_start < response_str + response.len ? (unsigned char)*value_start : 0);
                 }
+            } else {
+                ESP_LOGE(TAG, "Could not find colon after audioContent");
             }
+        } else {
+            ESP_LOGE(TAG, "Could not find \"audioContent\" in response");
         }
         
         if (!base64_audio || base64_len == 0) {
             const char *error_ptr = cJSON_GetErrorPtr();
             if (error_ptr != NULL) {
                 size_t error_offset = error_ptr - (const char *)response.data;
-                ESP_LOGE(TAG, "JSON parse error at offset %zu: %s", error_offset, error_ptr);
+                ESP_LOGE(TAG, "JSON parse error at offset %zu", error_offset);
                 size_t context_start = (error_offset > 100) ? error_offset - 100 : 0;
-                ESP_LOGE(TAG, "Context around error (offset %zu): %.200s", error_offset, (const char *)(response.data + context_start));
+                size_t context_len = (error_offset + 100 < response.len) ? 200 : (response.len - context_start);
+                ESP_LOGE(TAG, "Context around error: %.200s", (const char *)(response.data + context_start));
             }
-            ESP_LOGE(TAG, "Failed to parse JSON and manual extraction failed (len=%zu, first 200 chars: %.200s)", 
-                     response.len, (const char *)response.data);
+            ESP_LOGE(TAG, "Failed to parse JSON and manual extraction failed (len=%zu)", response.len);
+            ESP_LOGE(TAG, "First 200 chars: %.200s", (const char *)response.data);
+            ESP_LOGE(TAG, "Last 200 chars: %.200s", (const char *)(response.data + (response.len > 200 ? response.len - 200 : 0)));
             free(response.data);
             return ESP_FAIL;
         }
@@ -1029,19 +1118,82 @@ esp_err_t gemini_tts_streaming(const char *text, gemini_tts_playback_callback_t 
         return ESP_FAIL;
     }
     
+    // Validate pointer is within response buffer bounds and clamp length
+    const char *response_start = (const char *)response.data;
+    const char *response_end = response_start + response.len;
+    
+    if (base64_audio < response_start || base64_audio >= response_end) {
+        ESP_LOGE(TAG, "Base64 pointer out of bounds: base64_audio=%p, response_start=%p, response_end=%p",
+                 base64_audio, response_start, response_end);
+        free(response.data);
+        return ESP_FAIL;
+    }
+    
+    // Calculate actual available space from base64_audio to end of buffer
+    size_t available_space = response_end - base64_audio;
+    
+    // Clamp base64_len to available space if it exceeds
+    if (base64_len > available_space) {
+        ESP_LOGW(TAG, "Base64 length (%zu) exceeds available space (%zu), clamping to %zu", 
+                 base64_len, available_space, available_space);
+        base64_len = available_space;
+    }
+    
+    if (base64_len == 0) {
+        ESP_LOGE(TAG, "Base64 string is empty after bounds check");
+        free(response.data);
+        return ESP_FAIL;
+    }
+    
+    ESP_LOGI(TAG, "Base64 audio validated: %zu characters (pointer=%p, buffer=[%p-%p])", 
+             base64_len, base64_audio, response_start, response_end);
+    
+    // Debug: Log first few bytes as hex to see what we're getting
+    ESP_LOGD(TAG, "First 20 bytes of extracted base64 (hex):");
+    for (size_t i = 0; i < (base64_len < 20 ? base64_len : 20); i++) {
+        ESP_LOGD(TAG, "  [%zu] 0x%02x '%c'", i, (unsigned char)base64_audio[i], 
+                 (base64_audio[i] >= 32 && base64_audio[i] < 127) ? base64_audio[i] : '.');
+    }
+    
     // Check first few characters are valid base64
     bool valid_base64 = true;
-    for (size_t i = 0; i < (base64_len < 10 ? base64_len : 10); i++) {
+    size_t check_len = (base64_len < 50 ? base64_len : 50);  // Check more characters
+    for (size_t i = 0; i < check_len; i++) {
         char c = base64_audio[i];
         if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || 
               (c >= '0' && c <= '9') || c == '+' || c == '/' || c == '=')) {
             valid_base64 = false;
-            ESP_LOGE(TAG, "Invalid base64 character at offset %zu: 0x%02x ('%c')", i, (unsigned char)c, c);
+            ESP_LOGE(TAG, "Invalid base64 character at offset %zu: 0x%02x ('%c')", i, (unsigned char)c, 
+                     (c >= 32 && c < 127) ? c : '.');
+            
+            // Log context around the error
+            size_t context_start = (i > 20) ? i - 20 : 0;
+            size_t context_len = (i + 20 < base64_len) ? 40 : (base64_len - context_start);
+            ESP_LOGE(TAG, "Context around invalid char (offset %zu):", i);
+            for (size_t j = context_start; j < context_start + context_len && j < base64_len; j++) {
+                char ch = base64_audio[j];
+                ESP_LOGE(TAG, "  [%zu] 0x%02x '%c'", j, (unsigned char)ch, (ch >= 32 && ch < 127) ? ch : '.');
+            }
             break;
         }
     }
     if (!valid_base64) {
-        ESP_LOGE(TAG, "Base64 string contains invalid characters (first 50 chars: %.50s)", base64_audio);
+        ESP_LOGE(TAG, "Base64 string contains invalid characters");
+        ESP_LOGE(TAG, "Base64 pointer: %p, Response buffer: %p-%p", 
+                 base64_audio, response_start, response_end);
+        ESP_LOGE(TAG, "First 100 bytes (hex):");
+        for (size_t i = 0; i < (base64_len < 100 ? base64_len : 100); i++) {
+            if (i % 16 == 0) {
+                ESP_LOGE(TAG, "  %04zx:", i);
+            }
+            ESP_LOGE(TAG, " %02x", (unsigned char)base64_audio[i]);
+            if (i % 16 == 15) {
+                ESP_LOGE(TAG, "");
+            }
+        }
+        if (base64_len > 100) {
+            ESP_LOGE(TAG, "  ... (truncated, total %zu bytes)", base64_len);
+        }
         free(response.data);
         return ESP_FAIL;
     }

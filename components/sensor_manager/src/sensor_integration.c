@@ -40,8 +40,8 @@ static const char *TAG = "sensor_integration";
 #define I2C_MASTER_FREQ_HZ          100000 // I2C master clock frequency
 #define I2C_MASTER_TIMEOUT_MS       1000
 
-// Sensor sampling rate: 1Hz = 1000ms
-#define SENSOR_SAMPLE_INTERVAL_MS   1000
+// Sensor sampling rate: 1Hz = 1000ms (changed to 60s for publish interval)
+#define SENSOR_SAMPLE_INTERVAL_MS   60000  // 60 seconds
 
 // Sensor handles - TODO: Re-enable when sensor driver components are available
 static i2c_master_bus_handle_t s_i2c_bus = I2C_NUM_MAX; // Use invalid port instead of NULL

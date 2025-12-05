@@ -38,6 +38,8 @@ CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
 CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL=32768
 CONFIG_SPIRAM_USE_CAPS_ALLOC=y
 CONFIG_SPIRAM_MEMTEST=y
+# Note: CONFIG_SPIRAM_MALLOC_PREFER_EXTERNAL is not available in ESP-IDF 5.4
+# PSRAM preference is handled via heap_caps_malloc with MALLOC_CAP_SPIRAM
 
 # Increase main task stack size to prevent stack overflow during TTS
 CONFIG_ESP_MAIN_TASK_STACK_SIZE=16384
@@ -57,3 +59,21 @@ CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_INTERNAL=y
 
 # Increase watchdog timeout for initialization (default is 5 seconds)
 CONFIG_ESP_TASK_WDT_TIMEOUT_S=30
+
+# Disable mbedTLS certificate verification requirement for development
+# This allows HTTPS connections without certificate verification
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE=n
+CONFIG_MBEDTLS_CERTIFICATE_BUNDLE_DEFAULT_FULL=n
+# Enable insecure TLS mode (required for ESP_TLS_SKIP_SERVER_CERT_VERIFY)
+CONFIG_ESP_TLS_INSECURE=y
+# Enable skipping server certificate verification (required to avoid "No server verification option set" error)
+# This sets MBEDTLS_SSL_VERIFY_NONE when no CA cert is provided
+CONFIG_ESP_TLS_SKIP_SERVER_CERT_VERIFY=y
+
+# Enable LLM-TTS for environmental reports
+CONFIG_ENV_LLM_TTS_ENABLED=y
+
+# Memory optimizations for TLS and wake word
+CONFIG_SOC_SHA_DMA_MAX_BUFFER_SIZE=32768
+CONFIG_MBEDTLS_SSL_IN_CONTENT_LEN=12288
+CONFIG_MBEDTLS_SSL_OUT_CONTENT_LEN=4096

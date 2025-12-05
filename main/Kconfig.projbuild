@@ -75,6 +75,14 @@ config LOG_SWEEP_END_FREQ
             default ""
             help
                 WiFi network password
+
+        config ENV_LLM_TTS_ENABLED
+            bool "Enable LLM-TTS for environmental reports"
+            default y
+            help
+                Enable LLM (Large Language Model) and TTS (Text-to-Speech) for environmental reports.
+                When enabled, environmental reports will use Gemini LLM to generate natural language
+                summaries and speak them via TTS. When disabled, reports will only be logged.
     endmenu
 
 endmenu

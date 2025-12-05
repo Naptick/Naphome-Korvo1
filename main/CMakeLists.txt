@@ -35,6 +35,7 @@ idf_component_register(
         spiffs
         fatfs
         esp-tls
+        tls_mutex
     EMBED_FILES
         "../256kMeasSweep_0_to_20000_-12_dBFS_48k_Float_LR_refL.wav"
         "../offline_welcome.wav"

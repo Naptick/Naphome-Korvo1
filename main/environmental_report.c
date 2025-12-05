@@ -6,7 +6,11 @@
 #include "esp_log.h"
 #include "esp_http_client.h"
 #include "esp_tls.h"
+#include "esp_heap_caps.h"
+#include "tls_mutex.h"
+#ifdef CONFIG_MBEDTLS_CERTIFICATE_BUNDLE
 #include "esp_crt_bundle.h"
+#endif
 #include "esp_task_wdt.h"
 #include "cJSON.h"
 #include "time.h"
@@ -82,45 +86,62 @@ esp_err_t environmental_report_fetch_weather_data(char *weather_json, size_t wea
             .written = 0
         };
 
-        esp_http_client_config_t config = {
-            .url = url,
-            .event_handler = http_event_handler,
-            .timeout_ms = 10000,
-            .skip_cert_common_name_check = false,
-            .crt_bundle_attach = esp_crt_bundle_attach,
-            .user_data = &response_data,
-        };
-
-        esp_http_client_handle_t client = esp_http_client_init(&config);
-        if (client == NULL) {
-            ESP_LOGE(TAG, "Failed to initialize HTTP client for weather/air quality");
-            ret = ESP_ERR_NO_MEM;
+        // Configure TLS to skip certificate verification for development
+        // CONFIG_ESP_TLS_SKIP_SERVER_CERT_VERIFY=y in sdkconfig.defaults enables
+        // MBEDTLS_SSL_VERIFY_NONE when no CA cert is provided, avoiding the
+        // "No server verification option set" error
+        // Acquire TLS mutex to serialize TLS connections
+        // Use longer timeout to wait for sensor manager to finish (sensor publishes every 60s)
+        esp_err_t mutex_err = tls_mutex_take(pdMS_TO_TICKS(15000));  // 15 second timeout
+        if (mutex_err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to acquire TLS mutex: %s", esp_err_to_name(mutex_err));
+            ret = ESP_ERR_TIMEOUT;
         } else {
-            esp_task_wdt_reset();  // Feed watchdog before HTTP request
-            esp_err_t http_ret = esp_http_client_perform(client);
-            esp_task_wdt_reset();  // Feed watchdog after HTTP request
-            if (http_ret == ESP_OK) {
-                int status_code = esp_http_client_get_status_code(client);
-                if (status_code == 200) {
-                    ESP_LOGI(TAG, "Weather/air quality data fetched successfully (%zu bytes)", response_data.written);
-                    // Copy to air_quality_json if provided (same data)
-                    if (air_quality_json && air_quality_json_len > 0) {
-                        size_t copy_len = (response_data.written < air_quality_json_len - 1) 
-                                        ? response_data.written : air_quality_json_len - 1;
-                        memcpy(air_quality_json, weather_json, copy_len);
-                        air_quality_json[copy_len] = '\0';
+            esp_http_client_config_t config = {
+                .url = url,
+                .event_handler = http_event_handler,
+                .timeout_ms = 10000,
+                .skip_cert_common_name_check = true,  // Skip certificate verification for development
+                .crt_bundle_attach = NULL,  // Don't use certificate bundle
+                .use_global_ca_store = false,  // Don't use global CA store
+                .user_data = &response_data,
+            };
+
+            esp_http_client_handle_t client = esp_http_client_init(&config);
+            if (client == NULL) {
+                ESP_LOGE(TAG, "Failed to initialize HTTP client for weather/air quality");
+                tls_mutex_give();  // Release mutex on error
+                ret = ESP_ERR_NO_MEM;
+            } else {
+                esp_task_wdt_reset();  // Feed watchdog before HTTP request
+                esp_err_t http_ret = esp_http_client_perform(client);
+                esp_task_wdt_reset();  // Feed watchdog after HTTP request
+                if (http_ret == ESP_OK) {
+                    int status_code = esp_http_client_get_status_code(client);
+                    if (status_code == 200) {
+                        ESP_LOGI(TAG, "Weather/air quality data fetched successfully (%zu bytes)", response_data.written);
+                        // Copy to air_quality_json if provided (same data)
+                        if (air_quality_json && air_quality_json_len > 0) {
+                            size_t copy_len = (response_data.written < air_quality_json_len - 1) 
+                                            ? response_data.written : air_quality_json_len - 1;
+                            memcpy(air_quality_json, weather_json, copy_len);
+                            air_quality_json[copy_len] = '\0';
+                        }
+                    } else {
+                        ESP_LOGW(TAG, "Weather API returned status %d", status_code);
+                        weather_json[0] = '\0';
+                        if (air_quality_json) air_quality_json[0] = '\0';
                     }
                 } else {
-                    ESP_LOGW(TAG, "Weather API returned status %d", status_code);
+                    ESP_LOGW(TAG, "Failed to fetch weather/air quality: %s", esp_err_to_name(http_ret));
                     weather_json[0] = '\0';
                     if (air_quality_json) air_quality_json[0] = '\0';
                 }
-            } else {
-                ESP_LOGW(TAG, "Failed to fetch weather/air quality: %s", esp_err_to_name(http_ret));
-                weather_json[0] = '\0';
-                if (air_quality_json) air_quality_json[0] = '\0';
+                esp_http_client_cleanup(client);
+                
+                // Release TLS mutex after connection is complete
+                tls_mutex_give();
             }
-            esp_http_client_cleanup(client);
         }
     }
 
@@ -287,17 +308,56 @@ esp_err_t environmental_report_generate_and_speak(void)
     format_sensor_data_string(sensor_str, sizeof(sensor_str), &sensor_data);
 
     // Fetch weather and air quality data
-    char weather_json[4096] = {0};
-    char air_quality_json[2048] = {0};
-    environmental_report_fetch_weather_data(weather_json, sizeof(weather_json),
-                                            air_quality_json, sizeof(air_quality_json));
+    // Use PSRAM for large buffers to save internal RAM
+    size_t weather_buf_size = 16384;  // Increased from 4096 to 16KB
+    size_t air_quality_buf_size = 8192;  // Increased from 2048 to 8KB
+    char *weather_json = heap_caps_malloc(weather_buf_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    char *air_quality_json = heap_caps_malloc(air_quality_buf_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    
+    if (!weather_json || !air_quality_json) {
+        ESP_LOGE(TAG, "Failed to allocate weather/air quality buffers");
+        if (weather_json) heap_caps_free(weather_json);
+        if (air_quality_json) heap_caps_free(air_quality_json);
+        return ESP_ERR_NO_MEM;
+    }
+    
+    memset(weather_json, 0, weather_buf_size);
+    memset(air_quality_json, 0, air_quality_buf_size);
+    
+    // Retry logic for weather API call
+    esp_err_t fetch_ret = ESP_FAIL;
+    const int WEATHER_MAX_RETRIES = 2;
+    for (int retry = 0; retry <= WEATHER_MAX_RETRIES; retry++) {
+        fetch_ret = environmental_report_fetch_weather_data(weather_json, weather_buf_size,
+                                                              air_quality_json, air_quality_buf_size);
+        if (fetch_ret == ESP_OK) {
+            break;
+        }
+        if (retry < WEATHER_MAX_RETRIES) {
+            ESP_LOGW(TAG, "Weather API call failed (attempt %d/%d), retrying in 500ms...", 
+                     retry + 1, WEATHER_MAX_RETRIES + 1);
+            vTaskDelay(pdMS_TO_TICKS(500));
+        }
+    }
 
     char weather_str[256];
-    format_weather_summary(weather_str, sizeof(weather_str), weather_json);
-
     char air_quality_str[256];
-    format_air_quality_summary(air_quality_str, sizeof(air_quality_str), air_quality_json);
+    
+    if (fetch_ret == ESP_OK) {
+        format_weather_summary(weather_str, sizeof(weather_str), weather_json);
+        format_air_quality_summary(air_quality_str, sizeof(air_quality_str), air_quality_json);
+    } else {
+        ESP_LOGW(TAG, "Failed to fetch weather data after %d attempts, continuing with sensor data only", 
+                 WEATHER_MAX_RETRIES + 1);
+        snprintf(weather_str, sizeof(weather_str), "Weather data unavailable");
+        snprintf(air_quality_str, sizeof(air_quality_str), "Air quality data unavailable");
+    }
+    
+    // Free buffers after use
+    heap_caps_free(weather_json);
+    heap_caps_free(air_quality_json);
 
+#ifdef CONFIG_ENV_LLM_TTS_ENABLED
     // Build prompt for LLM
     char prompt[2048];
     snprintf(prompt, sizeof(prompt),
@@ -317,16 +377,34 @@ esp_err_t environmental_report_generate_and_speak(void)
     ESP_LOGI(TAG, "Sending prompt to LLM...");
     esp_task_wdt_reset();  // Feed watchdog before LLM call
 
-    // Wait a moment to ensure Gemini API is fully initialized
-    // voice_assistant_start() initializes the API, but there might be a brief delay
-    vTaskDelay(pdMS_TO_TICKS(500));
+    // Wait longer after weather API call to ensure TLS connection is fully closed
+    // This helps prevent MBEDTLS_ERR_SSL_ALLOC_FAILED errors from concurrent connections
+    // TLS connections need time to fully release internal RAM before starting new ones
+    vTaskDelay(pdMS_TO_TICKS(2000));
 
-    // Get LLM response
+    // Retry logic for LLM call
     char llm_response[512];
-    esp_err_t ret = gemini_llm(prompt, llm_response, sizeof(llm_response));
+    esp_err_t ret = ESP_FAIL;
+    const int LLM_MAX_RETRIES = 2;
+    for (int retry = 0; retry <= LLM_MAX_RETRIES; retry++) {
+        ret = gemini_llm(prompt, llm_response, sizeof(llm_response));
+        if (ret == ESP_OK) {
+            break;
+        }
+        
+        if (retry < LLM_MAX_RETRIES) {
+            ESP_LOGW(TAG, "LLM call failed (attempt %d/%d): %s, retrying in 2000ms...", 
+                     retry + 1, LLM_MAX_RETRIES + 1, esp_err_to_name(ret));
+            // Longer delay between retries to allow TLS resources to be fully released
+            vTaskDelay(pdMS_TO_TICKS(2000));  // Wait before retry
+            esp_task_wdt_reset();  // Feed watchdog during retry delay
+        }
+    }
+    
     esp_task_wdt_reset();  // Feed watchdog after LLM call
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to get LLM response: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "Failed to get LLM response after %d attempts: %s", 
+                 LLM_MAX_RETRIES + 1, esp_err_to_name(ret));
         if (ret == ESP_ERR_INVALID_STATE) {
             ESP_LOGE(TAG, "Gemini API not initialized - voice assistant may not be ready yet");
         }
@@ -350,4 +428,14 @@ esp_err_t environmental_report_generate_and_speak(void)
     wake_word_manager_resume();
 
     return ret;
+#else
+    // LLM-TTS disabled - just log the summary
+    ESP_LOGI(TAG, "Environmental Report Summary:");
+    ESP_LOGI(TAG, "Time: %s", time_str);
+    ESP_LOGI(TAG, "%s", sensor_str);
+    ESP_LOGI(TAG, "%s", weather_str);
+    ESP_LOGI(TAG, "%s", air_quality_str);
+    ESP_LOGI(TAG, "LLM-TTS disabled in configuration");
+    return ESP_OK;
+#endif
 }

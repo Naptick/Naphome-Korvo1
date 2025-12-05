@@ -1,0 +1,60 @@
+# Improved Training Configuration for "Hey Nap" Wake Word Model
+# Optimized for better detection performance (target: >0.5 scores)
+# ALL REQUIRED FIELDS INCLUDED
+
+# Target wake word/phrase (REQUIRED)
+target_phrase: ["hey nap"]
+
+# Model configuration (REQUIRED)
+model_name: "hey_nap"
+model_type: "dnn"
+layer_size: 256    # Increased from 128 for better learning capacity
+n_blocks: 2         # Increased from 1 for deeper network
+
+# Training data generation (REQUIRED)
+n_samples: 200000      # Increased from 100000 - more training data
+n_samples_val: 20000   # Increased from 10000 - better validation
+
+# Paths (REQUIRED)
+piper_sample_generator_path: "./piper_sample_generator"
+output_dir: "./my_custom_model"
+
+# Data augmentation (REQUIRED)
+augmentation_rounds: 2           # Increased from 1
+augmentation_batch_size: 32      # Increased from 16
+
+# Background audio and RIR paths (REQUIRED - can be empty)
+rir_paths: []
+background_paths: []
+background_paths_duplication_rate: [1]
+
+# Custom negative phrases (REQUIRED - for adversarial examples)
+custom_negative_phrases:
+  - "hey map"
+  - "hey nab"
+  - "hey napkin"
+  - "hey nappy"
+  - "hey napper"
+  - "hey napping"
+  - "hey napped"
+  - "hey napp"
+  - "hey napa"
+  - "hey nappie"
+  - "hey nappier"
+  - "hey nappies"
+  - "hey nappiest"
+
+# Training parameters (REQUIRED)
+steps: 20000          # Increased from 10000
+max_negative_weight: 15  # Increased from 10
+target_false_positives_per_hour: 0.3  # Lowered from 0.5 (stricter)
+batch_n_per_class: 8  # REQUIRED - batch size per class for training
+
+# TTS batch size (REQUIRED)
+tts_batch_size: 32   # Increased from 16
+
+# Feature data files (REQUIRED - can be empty)
+feature_data_files: {}
+
+# False positive validation data (REQUIRED - can be empty)
+false_positive_validation_data_path: ""

@@ -1,6 +1,7 @@
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <string.h>
 
 #include "audio_player.h"
@@ -24,6 +25,10 @@
 #include "audio_file_manager.h"
 #include "environmental_report.h"
 #include "esp_task_wdt.h"
+#include "tls_mutex.h"
+#include "gemini_api.h"
+#include "audio_player.h"
+#include "wake_word_manager.h"
 // WAV file is embedded via EMBED_FILES
 // Access it via the generated symbol (ESP-IDF generates these symbols automatically)
 extern const uint8_t _binary_256kMeasSweep_0_to_20000__12_dBFS_48k_Float_LR_refL_wav_start[] asm("_binary_256kMeasSweep_0_to_20000__12_dBFS_48k_Float_LR_refL_wav_start");
@@ -48,8 +53,18 @@ static const char *TAG = "korvo1_led_audio";
 // Webserver handle
 static webserver_t *s_webserver = NULL;
 
+// TTS callback for time announcement
+static esp_err_t time_tts_callback(const int16_t *samples, size_t sample_count, void *user_data)
+{
+    (void)user_data;
+    if (!samples || sample_count == 0) {
+        return ESP_OK;
+    }
+    return audio_player_submit_pcm(samples, sample_count, 24000, 1);  // 24kHz, mono
+}
+
 // BLE WiFi connect callback
-static bool ble_wifi_connect_cb(const char *ssid, const char *password, const char *user_token, bool is_production, void *ctx)
+__attribute__((unused)) static bool ble_wifi_connect_cb(const char *ssid, const char *password, const char *user_token, bool is_production, void *ctx)
 {
     (void)user_token;  // Not used for now
     (void)is_production;  // Not used for now
@@ -94,7 +109,7 @@ static bool ble_wifi_connect_cb(const char *ssid, const char *password, const ch
 }
 
 // BLE device command callback
-static esp_err_t ble_device_command_cb(const char *payload, void *ctx)
+__attribute__((unused)) static esp_err_t ble_device_command_cb(const char *payload, void *ctx)
 {
     (void)ctx;
     ESP_LOGI(TAG, "BLE: Received device command: %s", payload);
@@ -102,7 +117,7 @@ static esp_err_t ble_device_command_cb(const char *payload, void *ctx)
 }
 
 // Audio monitor for microphone input (used for LED reactivity)
-static TaskHandle_t s_audio_monitor_task = NULL;
+__attribute__((unused)) static TaskHandle_t s_audio_monitor_task = NULL;
 
 // LED strip handle
 static led_strip_handle_t s_strip = NULL;
@@ -141,7 +156,7 @@ static void set_pixel_rgb(uint32_t index, uint8_t r, uint8_t g, uint8_t b)
 }
 
 // Generate a logarithmic frequency sweep (chirp) as PCM samples
-static void generate_log_sweep(int16_t *samples, size_t num_samples, 
+__attribute__((unused)) static void generate_log_sweep(int16_t *samples, size_t num_samples, 
                                 int sample_rate, 
                                 float start_freq, float end_freq,
                                 float duration_sec)
@@ -290,7 +305,11 @@ static void play_mp3_file(const uint8_t *mp3_data, size_t mp3_len)
     }
     
     const size_t pcm_buffer_size = 1152 * 2; // MP3 frame size * 2 for safety
-    int16_t *pcm_buffer = malloc(pcm_buffer_size * sizeof(int16_t));
+    // Prefer PSRAM for audio buffers to preserve internal RAM for TLS
+    int16_t *pcm_buffer = heap_caps_malloc(pcm_buffer_size * sizeof(int16_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!pcm_buffer) {
+        pcm_buffer = malloc(pcm_buffer_size * sizeof(int16_t));
+    }
     if (!pcm_buffer) {
         ESP_LOGE(TAG, "Failed to allocate PCM buffer");
         mp3_decoder_destroy(decoder);
@@ -445,6 +464,15 @@ void app_main(void)
     // The timeout should be set via sdkconfig.defaults (30 seconds)
     esp_task_wdt_add(NULL);
     
+    // Initialize TLS mutex for serializing TLS connections
+    // This prevents concurrent TLS connections that cause memory allocation errors
+    esp_err_t tls_mutex_err = tls_mutex_init();
+    if (tls_mutex_err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize TLS mutex: %s", esp_err_to_name(tls_mutex_err));
+    } else {
+        ESP_LOGI(TAG, "✅ TLS mutex initialized - serializing TLS connections");
+    }
+    
     // Create dedicated watchdog feed task BEFORE any long operations
     // Use higher priority (5) to ensure it runs even when main task is busy
     // This ensures watchdog is fed continuously during initialization
@@ -545,8 +573,8 @@ void app_main(void)
         
         // After successful mount, increase frequency for better performance
         if (card->max_freq_khz > host.max_freq_khz) {
-            ESP_LOGI(TAG, "Card supports up to %d kHz, but using %d kHz for stability",
-                     card->max_freq_khz, host.max_freq_khz);
+            ESP_LOGI(TAG, "Card supports up to %lu kHz, but using %lu kHz for stability",
+                     (unsigned long)card->max_freq_khz, (unsigned long)host.max_freq_khz);
         }
     } else {
         ESP_LOGE(TAG, "SDMMC mount failed: %s (0x%x)", esp_err_to_name(ret), ret);
@@ -736,6 +764,62 @@ void app_main(void)
                              timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
                     // Wait a bit longer to ensure time is fully propagated
                     vTaskDelay(pdMS_TO_TICKS(500));
+                    
+                    // Announce time using TTS (if Gemini API is configured)
+                    // Initialize Gemini API early just for time announcement
+                    #ifdef CONFIG_GEMINI_API_KEY
+                    if (strlen(CONFIG_GEMINI_API_KEY) > 0) {
+                        // Initialize Gemini API for TTS (voice assistant will re-initialize later, but that's OK)
+                        gemini_config_t gemini_cfg = {
+                            .api_key = {0},
+                            .model = {0}
+                        };
+                        strncpy(gemini_cfg.api_key, CONFIG_GEMINI_API_KEY, sizeof(gemini_cfg.api_key) - 1);
+                        strncpy(gemini_cfg.model, CONFIG_GEMINI_MODEL, sizeof(gemini_cfg.model) - 1);
+                        
+                        esp_err_t api_init_ret = gemini_api_init(&gemini_cfg);
+                        if (api_init_ret == ESP_OK) {
+                            // Format time announcement
+                            char time_announcement[256];
+                            const char *ampm = (timeinfo.tm_hour >= 12) ? "PM" : "AM";
+                            int hour_12 = timeinfo.tm_hour % 12;
+                            if (hour_12 == 0) hour_12 = 12;
+                            
+                            const char *month_names[] = {
+                                "January", "February", "March", "April", "May", "June",
+                                "July", "August", "September", "October", "November", "December"
+                            };
+                            
+                            snprintf(time_announcement, sizeof(time_announcement),
+                                    "The current time is %d:%02d %s on %s %d, %d.",
+                                    hour_12, timeinfo.tm_min, ampm,
+                                    month_names[timeinfo.tm_mon],
+                                    timeinfo.tm_mday,
+                                    timeinfo.tm_year + 1900);
+                            
+                            ESP_LOGI(TAG, "Announcing time via TTS: %s", time_announcement);
+                            
+                            // Pause wake word detection during TTS (if initialized)
+                            // Note: wake word manager may not be initialized yet, but that's OK
+                            wake_word_manager_pause();
+                            
+                            // Generate and play TTS (non-blocking, but we'll wait a bit)
+                            esp_err_t tts_ret = gemini_tts_streaming(time_announcement, time_tts_callback, NULL);
+                            if (tts_ret != ESP_OK) {
+                                ESP_LOGW(TAG, "TTS announcement failed: %s (continuing anyway)", esp_err_to_name(tts_ret));
+                            } else {
+                                ESP_LOGI(TAG, "✅ Time announced via TTS");
+                                // Wait a bit for TTS to complete (rough estimate: ~3-5 seconds for announcement)
+                                vTaskDelay(pdMS_TO_TICKS(6000));
+                            }
+                            
+                            // Resume wake word detection
+                            wake_word_manager_resume();
+                        } else {
+                            ESP_LOGW(TAG, "Failed to initialize Gemini API for time announcement: %s", esp_err_to_name(api_init_ret));
+                        }
+                    }
+                    #endif
                 } else {
                     ESP_LOGW(TAG, "⚠️  Time synchronization failed - TLS certificate validation may fail");
                     ESP_LOGW(TAG, "⚠️  HTTPS requests will use development mode (certificate verification disabled)");
@@ -857,12 +941,37 @@ void app_main(void)
     
     // Initialize audio file manager (for MP3 playback)
     // Note: Main task is no longer monitored by watchdog, but we'll still feed it during scanning
+    ESP_LOGI(TAG, "Initializing audio file manager...");
     esp_err_t afm_err = audio_file_manager_init();
     if (afm_err != ESP_OK) {
         ESP_LOGW(TAG, "Failed to initialize audio file manager: %s", esp_err_to_name(afm_err));
     } else {
         size_t track_count = audio_file_manager_get_count();
         ESP_LOGI(TAG, "✅ Audio file manager initialized with %zu tracks", track_count);
+        
+        // Check if chants_thirdeyechakra file exists
+        audio_file_info_t file_info;
+        esp_err_t file_check = audio_file_manager_get_by_name("chants_thirdeyechakra", &file_info);
+        if (file_check == ESP_OK) {
+            ESP_LOGI(TAG, "✅ Found chants_thirdeyechakra.mp3: %s", file_info.display_name);
+        } else {
+            ESP_LOGW(TAG, "⚠️  chants_thirdeyechakra.mp3 not found in audio file list");
+            ESP_LOGW(TAG, "   Expected locations: /sdcard/sounds/chants_thirdeyechakra.mp3 or /sdcard/chants_thirdeyechakra.mp3");
+        }
+        
+        // Play chants_thirdeyechakra.mp3 from SD card (first 8 seconds, background)
+        ESP_LOGI(TAG, "Playing chants_thirdeyechakra.mp3 (8 seconds) from SD card...");
+        esp_err_t play_ret = audio_file_manager_play("chants_thirdeyechakra", 1.0f, 8);
+        if (play_ret != ESP_OK) {
+            ESP_LOGE(TAG, "❌ Failed to play chants_thirdeyechakra: %s", esp_err_to_name(play_ret));
+            if (play_ret == ESP_ERR_NOT_FOUND) {
+                ESP_LOGE(TAG, "   File not found. Please copy chants_thirdeyechakra.mp3 to SD card:");
+                ESP_LOGE(TAG, "   - /sdcard/sounds/chants_thirdeyechakra.mp3 (preferred)");
+                ESP_LOGE(TAG, "   - /sdcard/chants_thirdeyechakra.mp3 (fallback)");
+            }
+        } else {
+            ESP_LOGI(TAG, "✅ Started playback of chants_thirdeyechakra (8 seconds)");
+        }
     }
     
     // Initialize wake word detection

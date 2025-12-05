@@ -10,4 +10,5 @@ idf_component_register(
         mbedtls
         nvs_flash
         esp_timer
+        tls_mutex
 )

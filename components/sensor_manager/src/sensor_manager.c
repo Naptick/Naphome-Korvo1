@@ -13,9 +13,12 @@
 #include "sdkconfig.h"
 #include "esp_http_client.h"
 #include "esp_tls.h"
+#ifdef CONFIG_MBEDTLS_CERTIFICATE_BUNDLE
 #include "esp_crt_bundle.h"
+#endif
 #include "esp_timer.h"
 #include "somnus_profile.h"
+#include "tls_mutex.h"
 #include "cJSON.h"
 #include <time.h>
 #include <string.h>
@@ -335,12 +338,27 @@ static void sensor_manager_collect_and_publish(void)
     // Currently skipping due to PK verify errors (0x4290) - certificate signature verification failing
     // This is a temporary workaround for development
     ESP_LOGW(SENSOR_MANAGER_TAG, "⚠️  Development mode: Certificate verification disabled");
+    
+    // Acquire TLS mutex to serialize TLS connections
+    // This prevents concurrent TLS connections that cause memory allocation errors
+    esp_err_t mutex_err = tls_mutex_take(pdMS_TO_TICKS(5000));  // 5 second timeout
+    if (mutex_err != ESP_OK) {
+        ESP_LOGW(SENSOR_MANAGER_TAG, "Failed to acquire TLS mutex, skipping publish: %s", esp_err_to_name(mutex_err));
+        free(payload);
+        return;  // Non-blocking - skip this publish if mutex unavailable
+    }
+    
+    // Configure HTTP client to skip certificate verification
+    // CONFIG_ESP_TLS_SKIP_SERVER_CERT_VERIFY=y in sdkconfig.defaults enables
+    // MBEDTLS_SSL_VERIFY_NONE when no CA cert is provided, avoiding the
+    // "No server verification option set" error
     esp_http_client_config_t config = {
         .url = "https://api-uat.naptick.com/sensor-service/sensor-service/stream",
         .event_handler = http_event_handler,
         .timeout_ms = 5000,
         .skip_cert_common_name_check = true,  // Skip certificate verification for development
         .crt_bundle_attach = NULL,  // Don't use certificate bundle
+        .use_global_ca_store = false,  // Don't use global CA store
     };
     esp_http_client_handle_t client = esp_http_client_init(&config);
     if (client) {
@@ -359,6 +377,9 @@ static void sensor_manager_collect_and_publish(void)
     } else {
         ESP_LOGE(SENSOR_MANAGER_TAG, "Failed to initialize HTTP client");
     }
+    
+    // Release TLS mutex after connection is complete
+    tls_mutex_give();
 
     free(payload);
 }
