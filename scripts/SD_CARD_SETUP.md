@@ -114,12 +114,15 @@ Once the device is running, you can check if the SD card was detected:
 
 ## Troubleshooting
 
+**📋 Having issues even with FAT32?** See [SD_CARD_TROUBLESHOOTING.md](./SD_CARD_TROUBLESHOOTING.md) for detailed solutions.
+
 ### SD Card Not Detected
 
 1. **Check card format**: Ensure it's FAT32 or FAT16
-2. **Check card size**: Very large cards (>32GB) may need special formatting
-3. **Check GPIO pins**: Verify the SD card is connected to the correct pins
-4. **Check serial logs**: Look for error messages about SD card mounting
+2. **Check partition scheme**: Must be MBR (not GPT) - see troubleshooting guide
+3. **Check card size**: Very large cards (>32GB) may need special formatting
+4. **Check GPIO pins**: Verify the SD card is connected to the correct pins
+5. **Check serial logs**: Look for error messages about SD card mounting
 
 ### Files Not Found
 
@@ -135,6 +138,7 @@ If SDMMC mode fails, the device will automatically try SPI mode. If both fail:
 - Verify GPIO pin configuration matches your hardware
 - Check if SD card is properly inserted
 - Try a different SD card
+- **Even if FAT32, try reformatting** - see troubleshooting guide for details
 
 ## File Organization
 
