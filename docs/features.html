@@ -482,18 +482,18 @@
                 <p style="text-align: center; color: #667eea; margin-bottom: 20px; font-size: 1em;">
                     📄 <a href="phase-0.9-spec.html" style="color: #667eea; text-decoration: underline;">View Complete Phase 0.9 Specification Document</a>
                 </p>
-                <div style="background: #ffebee; border: 2px solid #d32f2f; border-radius: 10px; padding: 20px; margin-bottom: 30px;">
-                    <h3 style="color: #d32f2f; font-size: 1.3em; margin-bottom: 10px;">⚠️ Out of Scope for Phase 0.9</h3>
+                <div style="background: #fff3e0; border: 2px solid #f57c00; border-radius: 10px; padding: 20px; margin-bottom: 30px;">
+                    <h3 style="color: #f57c00; font-size: 1.3em; margin-bottom: 10px;">⚠️ Not Part of Phase 0.9 Specification</h3>
                     <p style="color: #666; margin-bottom: 10px;">
-                        The following technologies are <strong>entirely out of scope</strong> for Phase 0.9 and will not be implemented:
+                        The following technologies are <strong>not specified in the Phase 0.9 proposal</strong> but are being implemented in the current codebase:
                     </p>
                     <ul style="color: #666; margin-left: 20px; line-height: 1.8;">
-                        <li><strong>Google Gemini API</strong> - LLM, STT, and TTS (Text-to-Speech) services are not part of Phase 0.9 scope. Google Gemini TTS is explicitly excluded.</li>
-                        <li><strong>Korvo1 Hardware Platform</strong> - Phase 0.9 targets M5Stack Atom S3R, not Korvo1 board</li>
-                        <li><strong>OpenWakeWord</strong> - OpenWakeWord is out of scope. Phase 0.9 uses ESP-SR WakeNet for wake word detection.</li>
+                        <li><strong>Google Gemini API</strong> - LLM, STT, and TTS services are implemented but not part of Phase 0.9 specification. Currently working on TLS/certificate issues.</li>
+                        <li><strong>Korvo1 Hardware Platform</strong> - Current implementation targets Korvo1 board, but Phase 0.9 specification targets M5Stack Atom S3R</li>
+                        <li><strong>OpenWakeWord</strong> - OpenWakeWord is implemented but not in Phase 0.9 spec. Phase 0.9 specification calls for ESP-SR WakeNet instead.</li>
                     </ul>
                     <p style="color: #666; margin-top: 10px; font-size: 0.9em;">
-                        These features may be implemented in future phases but are explicitly excluded from Phase 0.9 deliverables.
+                        <strong>Note:</strong> These features are actively being developed but may not be fully functional yet. They represent enhancements beyond the Phase 0.9 scope.
                     </p>
                 </div>
                 
@@ -515,16 +515,17 @@
                         </div>
                     </div>
                     
-                    <!-- Korvo1 Hardware - OUT OF SCOPE -->
-                    <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border: 3px solid #d32f2f;">
+                    <!-- Korvo1 Hardware - NOT IN PHASE 0.9 SPEC -->
+                    <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border: 3px solid #f57c00;">
                         <div style="display: flex; align-items: center; margin-bottom: 15px;">
-                            <span style="font-size: 1.5em; margin-right: 10px;">❌</span>
-                            <h3 style="color: #d32f2f; font-size: 1.3em; margin: 0;">Korvo1 Hardware</h3>
+                            <span style="font-size: 1.5em; margin-right: 10px;">🟡</span>
+                            <h3 style="color: #f57c00; font-size: 1.3em; margin: 0;">Korvo1 Hardware</h3>
                         </div>
                         <div style="color: #666; line-height: 1.8;">
-                            <p><strong>Status:</strong> <span style="color: #d32f2f;">Out of Scope</span></p>
+                            <p><strong>Status:</strong> <span style="color: #f57c00;">Implemented (Not in Phase 0.9 Spec)</span></p>
                             <p style="font-size: 0.9em; color: #999; margin-top: 10px;">
-                                Korvo1 board is not part of Phase 0.9. Phase 0.9 targets M5Stack Atom S3R platform only.
+                                Current implementation targets Korvo1 board, but Phase 0.9 specification targets M5Stack Atom S3R platform. 
+                                Korvo1 implementation is functional and working.
                             </p>
                         </div>
                     </div>
@@ -581,25 +582,26 @@
                         </div>
                         <div style="color: #666; line-height: 1.8;">
                             <p><strong>Status:</strong> <span style="color: #f57c00;">In Progress / Needs Demo</span></p>
-                            <p><strong>Phase 0.9:</strong> ESP-SR WakeNet integration (1-2m range)</p>
+                            <p><strong>Phase 0.9 Spec:</strong> ESP-SR WakeNet integration (1-2m range)</p>
+                            <p><strong>Current Implementation:</strong> OpenWakeWord (not in Phase 0.9 spec, but implemented)</p>
                             <p style="font-size: 0.9em; color: #999; margin-top: 10px;">
-                                <strong>Note:</strong> Phase 0.9 specification includes ESP-SR "Hey Naphome" wake word recognition. 
-                                OpenWakeWord is out of scope.
+                                <strong>Note:</strong> Phase 0.9 specification calls for ESP-SR "Hey Naphome" wake word recognition. 
+                                Current codebase implements OpenWakeWord instead, which is functional but not in the Phase 0.9 spec.
                             </p>
                         </div>
                     </div>
                     
-                    <!-- Google Gemini - OUT OF SCOPE -->
-                    <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border: 3px solid #d32f2f;">
+                    <!-- Google Gemini - NOT IN PHASE 0.9 SPEC -->
+                    <div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border: 3px solid #f57c00;">
                         <div style="display: flex; align-items: center; margin-bottom: 15px;">
-                            <span style="font-size: 1.5em; margin-right: 10px;">❌</span>
-                            <h3 style="color: #d32f2f; font-size: 1.3em; margin: 0;">Google Gemini API</h3>
+                            <span style="font-size: 1.5em; margin-right: 10px;">🟡</span>
+                            <h3 style="color: #f57c00; font-size: 1.3em; margin: 0;">Google Gemini API</h3>
                         </div>
                         <div style="color: #666; line-height: 1.8;">
-                            <p><strong>Status:</strong> <span style="color: #d32f2f;">Out of Scope</span></p>
+                            <p><strong>Status:</strong> <span style="color: #f57c00;">Implemented (Not in Phase 0.9 Spec)</span></p>
                             <p style="font-size: 0.9em; color: #999; margin-top: 10px;">
-                                LLM, STT, and TTS (Text-to-Speech) services are not part of Phase 0.9. 
-                                Google Gemini TTS is explicitly excluded. Voice assistant features are out of scope.
+                                LLM, STT, and TTS services are implemented but not part of Phase 0.9 specification. 
+                                Currently working on TLS/certificate configuration issues. Voice assistant features are functional but need TLS fixes.
                             </p>
                         </div>
                     </div>
@@ -700,10 +702,10 @@
                                 <div style="color: #555; margin-top: 5px; font-weight: bold;">In Progress</div>
                                 <div style="color: #666; margin-top: 5px; font-size: 0.9em;">Cloud integration</div>
                             </div>
-                            <div style="text-align: center; padding: 20px; background: #ffebee; border-radius: 8px; border: 3px solid #d32f2f;">
-                                <div style="font-size: 2.5em; font-weight: bold; color: #d32f2f;">❌</div>
-                                <div style="color: #555; margin-top: 5px; font-weight: bold;">Out of Scope</div>
-                                <div style="color: #666; margin-top: 5px; font-size: 0.9em;">Gemini (TTS), Korvo1, OpenWakeWord</div>
+                            <div style="text-align: center; padding: 20px; background: #fff3e0; border-radius: 8px; border: 3px solid #f57c00;">
+                                <div style="font-size: 2.5em; font-weight: bold; color: #f57c00;">🟡</div>
+                                <div style="color: #555; margin-top: 5px; font-weight: bold;">Not in Phase 0.9 Spec</div>
+                                <div style="color: #666; margin-top: 5px; font-size: 0.9em;">Gemini, Korvo1, OpenWakeWord (implemented but not in spec)</div>
                             </div>
                         </div>
                     </div>
@@ -752,7 +754,7 @@
                                 <ul style="color: #666; line-height: 1.8; font-size: 0.95em;">
                                     <li><strong>Google Gemini API</strong> - LLM, STT, TTS services</li>
                                     <li><strong>Korvo1 hardware</strong> - Phase 0.9 targets M5Stack Atom S3R</li>
-                                    <li><strong>OpenWakeWord</strong> - Excluded (ESP-SR is in scope for Phase 0.9)</li>
+                                    <li><strong>OpenWakeWord</strong> - Implemented but not in Phase 0.9 spec (spec calls for ESP-SR)</li>
                                     <li><strong>Voice assistant</strong> - Full STT-LLM-TTS pipeline</li>
                                     <li><strong>Advanced audio processing</strong> - Beyond basic I/O</li>
                                     <li><strong>BLE provisioning</strong> - Not in Phase 0.9 scope</li>
@@ -781,8 +783,8 @@
                         <ul style="color: #666; margin-top: 10px; margin-left: 20px; line-height: 1.8;">
                             <li><strong>In Scope:</strong> M5Stack Atom S3R hardware, sensor integration (SHT30, SGP30, BH1750, SCD30, SPS30), 
                             basic audio I/O (ICS-43434 mics, TPA3116D2 amp), WiFi connectivity, AWS IoT Core MQTT integration</li>
-                            <li><strong>Out of Scope:</strong> Google Gemini API (LLM/STT/TTS - including TTS), Korvo1 hardware platform, OpenWakeWord (ESP-SR is in scope), 
-                            voice assistant features, advanced audio processing</li>
+                            <li><strong>Not in Phase 0.9 Spec (but implemented):</strong> Google Gemini API (LLM/STT/TTS), Korvo1 hardware platform, OpenWakeWord. 
+                            These features are implemented and functional but not part of the Phase 0.9 specification. Phase 0.9 spec calls for ESP-SR (not OpenWakeWord) and M5Stack Atom S3R (not Korvo1).</li>
                         </ul>
                     </div>
                 </div>
