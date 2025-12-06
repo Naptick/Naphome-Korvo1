@@ -266,8 +266,14 @@
                         <li>Multi-microphone support (ES7210)</li>
                         <li>Automatic pause during playback</li>
                     </ul>
+                    <div style="background: #ffebee; padding: 12px; border-radius: 5px; margin-top: 10px; border-left: 3px solid #d32f2f;">
+                        <p style="font-size: 0.9em; color: #c62828; margin: 0; font-weight: bold;">
+                            ⚠️ Important: ESP-SR cannot be trained by users - requires paid Espressif service. 
+                            OpenWakeWord chosen for open-source training capability.
+                        </p>
+                    </div>
                     <p style="font-size: 0.9em; color: #f57c00; margin-top: 10px; font-style: italic;">
-                        ⚠️ Model training has dependency management challenges (PyTorch/ONNX/TensorFlow/TFLite conversion chain)
+                        ⚠️ OpenWakeWord model training has dependency management challenges (PyTorch/ONNX/TensorFlow/TFLite conversion chain)
                     </p>
                 </div>
                 
@@ -500,7 +506,7 @@
                     <ul style="color: #666; margin-left: 20px; line-height: 1.8;">
                         <li><strong>Google Gemini API</strong> - LLM, STT, and TTS services are implemented and working. Some TLS/certificate issues in development mode, but core functionality is operational.</li>
                         <li><strong>Korvo1 Hardware Platform</strong> - Current implementation targets Korvo1 board (functional and working), but Phase 0.9 specification targets M5Stack Atom S3R</li>
-                        <li><strong>OpenWakeWord</strong> - OpenWakeWord is implemented and working but not in Phase 0.9 spec. Phase 0.9 specification calls for ESP-SR WakeNet instead. Currently training custom "Hey Nap" model - dependency management (PyTorch/ONNX/TensorFlow/TFLite) is very problematic.</li>
+                        <li><strong>OpenWakeWord</strong> - OpenWakeWord is implemented and working but not in Phase 0.9 spec. Phase 0.9 specification calls for ESP-SR WakeNet instead. <strong>Important discovery:</strong> ESP-SR cannot be trained by users - custom wake word training requires paying Espressif as a service. This is why OpenWakeWord was chosen. Currently training custom "Hey Nap" model - dependency management (PyTorch/ONNX/TensorFlow/TFLite) is very problematic.</li>
                     </ul>
                     <p style="color: #666; margin-top: 10px; font-size: 0.9em;">
                         <strong>Note:</strong> These features are <strong>functional and working</strong> but represent enhancements beyond the Phase 0.9 scope. They are marked with 🔵 blue cards to distinguish them from in-progress (🟡 yellow) or out-of-scope (❌ red) features.
@@ -599,16 +605,24 @@
                             <p><strong>Status:</strong> <span style="color: #f57c00;">In Progress / Needs Demo</span></p>
                             <p><strong>Phase 0.9 Spec:</strong> ESP-SR WakeNet integration (1-2m range)</p>
                             <p><strong>Current Implementation:</strong> OpenWakeWord (not in Phase 0.9 spec, but implemented)</p>
+                            <div style="background: #ffebee; padding: 12px; border-radius: 5px; margin-top: 10px; border-left: 3px solid #d32f2f;">
+                                <p style="font-size: 0.9em; color: #c62828; margin: 0;">
+                                    <strong>⚠️ Important Discovery:</strong> ESP-SR wake word models cannot be trained by end users. 
+                                    Custom wake word training for ESP-SR must be done by Espressif as a paid service. 
+                                    This is why OpenWakeWord was chosen as an alternative - it allows open-source, user-trainable models.
+                                </p>
+                            </div>
                             <div style="background: #fff3e0; padding: 12px; border-radius: 5px; margin-top: 10px; border-left: 3px solid #f57c00;">
                                 <p style="font-size: 0.9em; color: #666; margin: 0;">
-                                    <strong>⚠️ Model Training:</strong> Currently training a custom "Hey Nap" model for OpenWakeWord. 
+                                    <strong>⚠️ OpenWakeWord Model Training:</strong> Currently training a custom "Hey Nap" model for OpenWakeWord. 
                                     The training process is very problematic due to complex dependency management issues (PyTorch, ONNX, TensorFlow, TFLite conversion chain). 
                                     Dependency conflicts and version incompatibilities make the training pipeline difficult to set up and maintain.
                                 </p>
                             </div>
                             <p style="font-size: 0.9em; color: #999; margin-top: 10px;">
                                 <strong>Note:</strong> Phase 0.9 specification calls for ESP-SR "Hey Naphome" wake word recognition. 
-                                Current codebase implements OpenWakeWord instead, which is functional but not in the Phase 0.9 spec.
+                                Current codebase implements OpenWakeWord instead, which is functional but not in the Phase 0.9 spec. 
+                                ESP-SR would require paying Espressif for custom model training.
                             </p>
                         </div>
                     </div>
@@ -776,7 +790,7 @@
                                 <ul style="color: #666; line-height: 1.8; font-size: 0.95em;">
                                     <li><strong>Google Gemini API</strong> - LLM, STT, TTS services</li>
                                     <li><strong>Korvo1 hardware</strong> - Phase 0.9 targets M5Stack Atom S3R</li>
-                                    <li><strong>OpenWakeWord</strong> - Implemented but not in Phase 0.9 spec (spec calls for ESP-SR). Custom model training in progress - dependency issues with PyTorch/ONNX/TensorFlow/TFLite conversion chain.</li>
+                                    <li><strong>OpenWakeWord</strong> - Implemented but not in Phase 0.9 spec (spec calls for ESP-SR). <strong>Key finding:</strong> ESP-SR training cannot be done by users - requires paid Espressif service. OpenWakeWord chosen for open-source training. Custom model training in progress - dependency issues with PyTorch/ONNX/TensorFlow/TFLite conversion chain.</li>
                                     <li><strong>Voice assistant</strong> - Full STT-LLM-TTS pipeline</li>
                                     <li><strong>Advanced audio processing</strong> - Beyond basic I/O</li>
                                     <li><strong>BLE provisioning</strong> - Not in Phase 0.9 scope</li>
